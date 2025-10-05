@@ -1,3 +1,4 @@
+// app.js
 // app.js - single file Halloween Galaxy web app (frontend + backend)
 // Usage: set env vars DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET
 // DATABASE_URL removed — using local SQLite file 'data.db'
