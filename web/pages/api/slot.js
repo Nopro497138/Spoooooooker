@@ -1,89 +1,74 @@
 // web/pages/api/slot.js
-// Simulates a slot machine spin and updates user's points.
+// Server-side slot logic: validates bet, computes reels & multiplier, updates points in JSON DB.
 
-const cookie = require('cookie');
-const { getDb } = require('../../lib/db');
+const { getDb } = require('../../lib/db')
+const cookie = require('cookie')
+
+// simple symbol set and multiplier rules
+const SYMBOLS = ['🍒','🎃','⭐','👻','💀']
+const WEIGHTS = [40, 20, 15, 15, 10] // same as client
+function pickSymbol() {
+  const total = WEIGHTS.reduce((a,b)=>a+b,0)
+  let r = Math.floor(Math.random() * total)
+  for (let i=0;i<WEIGHTS.length;i++){
+    r -= WEIGHTS[i]
+    if (r < 0) return SYMBOLS[i]
+  }
+  return SYMBOLS[0]
+}
+
+function computeMultiplier(reels) {
+  // if three same -> big reward based on symbol
+  if (reels[0] === reels[1] && reels[1] === reels[2]) {
+    const s = reels[0]
+    if (s === '🍒') return 2
+    if (s === '🎃') return 4
+    if (s === '⭐') return 6
+    if (s === '👻') return 8
+    if (s === '💀') return 12 // rare jackpot
+  }
+  // two of same = small win
+  if (reels[0] === reels[1] || reels[1] === reels[2] || reels[0] === reels[2]) return 1.5
+  return 0
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
+    res.status(405).json({ error: 'Method not allowed' }); return
   }
 
-  const cookies = req.headers.cookie ? cookie.parse(req.headers.cookie) : {};
-  const discordId = cookies.discord_id;
-  if (!discordId) return res.status(401).json({ error: 'Not authenticated. Please sign in with Discord.' });
+  const cookies = req.headers.cookie ? cookie.parse(req.headers.cookie) : {}
+  const discordId = cookies.discord_id
+  if (!discordId) return res.status(401).json({ error: 'Not authenticated' })
 
-  const betRaw = req.body?.bet ?? req.query?.bet;
-  const bet = Number(betRaw);
-  if (!bet || isNaN(bet) || bet <= 0) return res.status(400).json({ error: 'Invalid bet amount.' });
+  const betRaw = req.body?.bet
+  const bet = Number(betRaw)
+  if (!bet || isNaN(bet) || bet <= 0) return res.status(400).json({ error: 'Invalid bet' })
 
   try {
-    const db = await getDb();
-    const r = await db.getUser(discordId);
-    if (!r) return res.status(400).json({ error: 'User not found.' });
-    let points = Number(r.points || 0);
+    const db = await getDb()
+    const user = await db.getUser(discordId)
+    if (!user) return res.status(400).json({ error: 'User not found' })
+    if (bet > user.points) return res.status(400).json({ error: 'Insufficient points' })
 
-    if (bet > points) return res.status(400).json({ error: 'Insufficient points.' });
+    // pick reels
+    const reels = [pickSymbol(), pickSymbol(), pickSymbol()]
+    const multiplier = computeMultiplier(reels)
+    const won = Math.floor(multiplier * bet)
+    const change = won - bet
+    const newPoints = user.points - bet + Math.max(0, won)
 
-    // Slot logic: three reels, symbols mapped to payout multipliers.
-    // We'll simulate a basic slot: symbols array with weighted probabilities.
+    await db.updatePoints(discordId, newPoints)
 
-    const symbols = [
-      { name: '🍒', weight: 40, mult: 0.5 },
-      { name: '🔔', weight: 30, mult: 1 },
-      { name: '⭐', weight: 20, mult: 2 },
-      { name: '💀', weight: 8, mult: 5 },
-      { name: '🎃', weight: 2, mult: 10 }
-    ];
+    let outcome = 'Lose'
+    if (multiplier === 0) outcome = 'Lose'
+    else if (multiplier === 1.5) outcome = 'Small win'
+    else if (multiplier > 1 && multiplier <=4) outcome = 'Nice win'
+    else outcome = 'Jackpot!'
 
-    // build cumulative for random draw
-    const totalWeight = symbols.reduce((s, x) => s + x.weight, 0);
-    function pickSymbol() {
-      let r = Math.random() * totalWeight;
-      for (const s of symbols) {
-        r -= s.weight;
-        if (r <= 0) return s;
-      }
-      return symbols[0];
-    }
-
-    const reel1 = pickSymbol();
-    const reel2 = pickSymbol();
-    const reel3 = pickSymbol();
-
-    // determine outcome: if all three same -> payout mult = symbol.mult * 3
-    // if two same -> smaller payout; else small loss
-    let multiplier = 0;
-    let outcome = 'Lose';
-    if (reel1.name === reel2.name && reel2.name === reel3.name) {
-      multiplier = reel1.mult * 3;
-      outcome = 'Big Win';
-    } else if (reel1.name === reel2.name || reel1.name === reel3.name || reel2.name === reel3.name) {
-      // find matched symbol mult
-      const matched = reel1.name === reel2.name ? reel1 : (reel1.name === reel3.name ? reel1 : reel2);
-      multiplier = matched.mult * 1.5;
-      outcome = 'Small Win';
-    } else {
-      multiplier = 0;
-      outcome = 'Lose';
-    }
-
-    const won = Math.floor(multiplier * bet);
-    const change = won - bet;
-    const newPoints = points - bet + Math.max(0, won);
-
-    await db.updatePoints(discordId, newPoints);
-
-    res.json({
-      outcome,
-      multiplier,
-      change,
-      newPoints,
-      reels: [reel1.name, reel2.name, reel3.name]
-    });
+    res.json({ reels, multiplier, won, change, newPoints, outcome })
   } catch (err) {
-    console.error('api/slot error', err);
-    res.status(500).json({ error: 'Server error.' });
+    console.error('api/slot error', err)
+    res.status(500).json({ error: 'Server error' })
   }
 }
