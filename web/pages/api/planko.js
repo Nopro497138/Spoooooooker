@@ -26,13 +26,18 @@ export default async function handler(req, res) {
 
     if (bet > points) return res.status(400).json({ error: 'Insufficient points.' });
 
-    // roll logic
-    const roll = Math.floor(Math.random() * 1000); // 0..999
+    // roll logic for Planko (ball falls into multipliers)
+    const roll = Math.random(); // 0..1
+    // map to multipliers distribution
+    // 0..0.7 -> lose (0)
+    // 0.7..0.9 -> 1.5x
+    // 0.9..0.97 -> 2x
+    // 0.97..1 -> 5x
     let multiplier = 0;
     let outcome = 'Lose';
-    if (roll < 700) { multiplier = 0; outcome = 'Lose'; }
-    else if (roll < 900) { multiplier = 1.5; outcome = 'Small win'; }
-    else if (roll < 970) { multiplier = 2; outcome = 'Nice win'; }
+    if (roll < 0.7) { multiplier = 0; outcome = 'Lose'; }
+    else if (roll < 0.9) { multiplier = 1.5; outcome = 'Small win'; }
+    else if (roll < 0.97) { multiplier = 2; outcome = 'Nice win'; }
     else { multiplier = 5; outcome = 'Jackpot!'; }
 
     const won = Math.floor(multiplier * bet);
@@ -41,7 +46,14 @@ export default async function handler(req, res) {
 
     await db.updatePoints(discordId, newPoints);
 
-    res.json({ outcome, multiplier, change, newPoints });
+    // include chosen "slot" index for frontend animation (0..3 representing multiplier buckets)
+    let bucket = 0;
+    if (multiplier === 0) bucket = 0;
+    else if (multiplier === 1.5) bucket = 1;
+    else if (multiplier === 2) bucket = 2;
+    else bucket = 3;
+
+    res.json({ outcome, multiplier, change, newPoints, bucket });
   } catch (err) {
     console.error('api/planko error', err);
     res.status(500).json({ error: 'Server error.' });
