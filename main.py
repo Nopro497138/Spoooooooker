@@ -1,3 +1,4 @@
+# main.py
 # bot.py
 import os
 import asyncio
@@ -10,10 +11,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# DATABASE_URL removed — using local SQLite file 'data.db'
+# No DATABASE_URL — local sqlite used
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
-WEBSITE_URL = os.getenv("NEXT_PUBLIC_WEBSITE_URL") or os.getenv("WEBSITE_URL") or "https://spoooooooker.vercel.app/"
+WEBSITE_URL = os.getenv("NEXT_PUBLIC_WEBSITE_URL") or os.getenv("WEBSITE_URL") or "https://your-site.vercel.app"
 BOT_OWNER_ID = int(os.getenv("BOT_OWNER_ID")) if os.getenv("BOT_OWNER_ID") else None
 
 intents = discord.Intents.default()
@@ -37,9 +38,10 @@ CREATE TABLE IF NOT EXISTS users (
 """
 
 async def ensure_user(conn: aiosqlite.Connection, discord_id: int):
+    # On first sight give 50 starter points (matches website)
     await conn.execute("""
         INSERT OR IGNORE INTO users (discord_id, points, messages)
-        VALUES (?, 0, 0);
+        VALUES (?, 50, 0);
     """, (discord_id,))
     await conn.commit()
 
@@ -102,14 +104,14 @@ async def on_message(message: discord.Message):
 async def info(interaction: discord.Interaction):
     embed = discord.Embed(
         title="👻 Halloween-Planko — Info",
-        description="Welcome! This bot tracks your messages and awards Halloween Points. Use them on the website to play Planko.",
+        description="Welcome! This bot tracks your messages and awards Halloween Points. Use them on the website to play games like Planko and the Slot Machine.",
         color=EMBED_COLOR,
         timestamp=datetime.utcnow()
     )
-    embed.add_field(name="Website", value=f"[Open Halloween Galaxy]({WEBSITE_URL})", inline=False)
+    embed.add_field(name="Website", value=f"[Open Spoooooooker]({WEBSITE_URL})", inline=False)
     embed.add_field(name="How to earn points", value="Send messages in any server where the bot has access. Every 50 messages = 1 Halloween Point.", inline=False)
-    embed.add_field(name="How to use points", value="Log into the website using Discord OAuth, your Discord account will be linked and your points synced. Play Planko by placing bets with points.", inline=False)
-    embed.set_footer(text="Bot by your team — All bot messages use embeds for a professional look.")
+    embed.add_field(name="How to use points", value="Log into the website using Discord OAuth, your Discord account will be linked and your points synced. Spend points on Games and in the Shop.", inline=False)
+    embed.set_footer(text="Have fun — good luck!")
     await interaction.response.send_message(embed=embed)
 
 # Admin helper: show user status
