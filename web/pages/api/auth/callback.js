@@ -1,7 +1,6 @@
 // web/pages/api/auth/callback.js
-// Exchanges the OAuth code for a token, fetches the Discord user,
-// upserts them into the local DB and sets a secure HttpOnly cookie.
-// Uses global fetch (no node-fetch) and the local sqlite wrapper.
+// Exchanges OAuth code, fetches Discord user, upserts into JSON DB and sets cookie.
+// Uses global fetch (Next.js provides it in modern environments).
 
 const cookie = require('cookie');
 const { getDb } = require('../../../lib/db');
@@ -21,7 +20,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // build redirect uri same as in /api/auth/login
     const proto = req.headers['x-forwarded-proto'] || 'https';
     const host = req.headers['x-forwarded-host'] || req.headers.host;
     const redirect_uri = `${proto}://${host}/api/auth/callback`;
@@ -34,7 +32,6 @@ export default async function handler(req, res) {
     params.append('redirect_uri', redirect_uri);
     params.append('scope', 'identify');
 
-    // use global fetch available in modern Node/Next environments
     const tokenResp = await globalThis.fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       body: params,
@@ -57,17 +54,10 @@ export default async function handler(req, res) {
       return;
     }
 
-    // upsert into sqlite
+    // Upsert in JSON DB
     const db = await getDb();
-    const existing = await db.get('SELECT * FROM users WHERE discord_id = ?', [userData.id]);
-    if (!existing) {
-      await db.run('INSERT INTO users (discord_id, points, messages) VALUES (?, ?, ?)', [userData.id, 10, 0]);
-    }
-    // upsert meta — SQLite UPSERT (excluded) syntax
-    await db.run(`
-      INSERT INTO users_meta (discord_id, username, discriminator) VALUES (?, ?, ?)
-      ON CONFLICT(discord_id) DO UPDATE SET username = excluded.username, discriminator = excluded.discriminator
-    `, [userData.id, userData.username, userData.discriminator]);
+    await db.addUserIfNotExist(userData.id, 10); // starter 10 points if new
+    await db.upsertMeta(userData.id, userData.username, userData.discriminator);
 
     // set cookie
     const isProd = process.env.NODE_ENV === 'production';
@@ -80,7 +70,6 @@ export default async function handler(req, res) {
     });
     res.setHeader('Set-Cookie', cookieStr);
 
-    // redirect home
     res.writeHead(302, { Location: '/' });
     res.end();
   } catch (err) {
