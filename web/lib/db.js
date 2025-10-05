@@ -79,7 +79,8 @@ async function getDb() {
       return { ...cache.users[id] };
     },
 
-    async addUserIfNotExist(discordId, starterPoints = 10) {
+    // Starter points default changed to 50
+    async addUserIfNotExist(discordId, starterPoints = 50) {
       await loadIfNeeded();
       const id = String(discordId);
       if (!cache.users[id]) {
@@ -139,7 +140,6 @@ async function getDb() {
         };
       }
       cache.users[id].points = (Number(cache.users[id].points) || 0) + Number(amount);
-      // record a "system purchase-like" entry for auditing
       cache.purchases.push({
         id: cache._nextPurchaseId++,
         discord_id: id,
@@ -210,7 +210,6 @@ async function getDb() {
       let list = cache.purchases.slice();
       if (filter.discord_id) list = list.filter(p => p.discord_id === String(filter.discord_id));
       if (filter.status) list = list.filter(p => p.status === filter.status);
-      // newest first
       list.sort((a,b)=> new Date(b.created_at) - new Date(a.created_at));
       return list.map(p => ({ ...p }));
     },
