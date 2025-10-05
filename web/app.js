@@ -1,10 +1,12 @@
 // app.js - single file Halloween Galaxy web app (frontend + backend)
-// Usage: set env vars DATABASE_URL, DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, WEBSITE_URL
-// Deploy: Railway, Render, Heroku recommended for single-file server
+// Usage: set env vars DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET
+// DATABASE_URL removed — using local SQLite file 'data.db'
+// NOTE: WEBSITE_URL and PORT env vars removed; redirect URIs are built dynamically per request.
 
 require('dotenv').config();
 const express = require('express');
-const { Pool } = require('pg');
+const sqlite3 = require('sqlite3');
+const { open } = require('sqlite');
 const fetch = require('node-fetch');
 const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
@@ -14,35 +16,49 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-const PORT = process.env.PORT || 3000;
-const DATABASE_URL = process.env.DATABASE_URL;
+// no PORT env usage per request — server listens on fixed port 3000 for local runs
+// no global WEBSITE_URL env; build redirect URIs dynamically
+
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
-const WEBSITE_URL = process.env.WEBSITE_URL || `http://localhost:${PORT}`;
 
-if (!DATABASE_URL || !DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET) {
-  console.error("Missing required env vars. Set DATABASE_URL, DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET.");
+if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET) {
+  console.error("Missing required env vars. Set DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET.");
   process.exit(1);
 }
 
-const pool = new Pool({ connectionString: DATABASE_URL });
+let db;
 
-// Ensure table
+// helper to get base url dynamically from request
+function getBaseUrl(req) {
+  return `${req.protocol}://${req.get('host')}`;
+}
+
+// open local sqlite db and ensure tables
 (async () => {
-  const client = await pool.connect();
-  try {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        discord_id BIGINT PRIMARY KEY,
-        points INTEGER NOT NULL DEFAULT 0,
-        messages INTEGER NOT NULL DEFAULT 0,
-        created_at TIMESTAMPTZ DEFAULT now()
-      );
-    `);
-    console.log("DB ready.");
-  } finally {
-    client.release();
-  }
+  db = await open({
+    filename: './data.db',
+    driver: sqlite3.Database
+  });
+
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      discord_id TEXT PRIMARY KEY,
+      points INTEGER NOT NULL DEFAULT 0,
+      messages INTEGER NOT NULL DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS users_meta (
+      discord_id TEXT PRIMARY KEY,
+      username TEXT,
+      discriminator TEXT
+    );
+  `);
+
+  console.log("Local SQLite DB ready.");
 })();
 
 // Helper cookie/session (very simple): store discord_id in an HttpOnly cookie
@@ -56,12 +72,11 @@ function setSessionCookie(res, discordId) {
 }
 
 // Simple HTML page (single file) with inline CSS & JS (Halloween Galaxy style)
-function renderHomeHtml(userData) {
+function renderHomeHtml(userData, websiteUrl, clientId) {
   const loggedIn = !!userData;
-  const username = userData ? `${userData.username}#${userData.discriminator}` : '';
+  const username = userData ? `${userData.username}${userData.discriminator ? '#' + userData.discriminator : ''}` : '';
   const points = userData ? userData.points : 0;
-  const clientId = DISCORD_CLIENT_ID;
-  const redirect = encodeURIComponent(`${WEBSITE_URL}/auth/callback`);
+  const redirect = encodeURIComponent(`${websiteUrl}/auth/callback`);
   const loginUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirect}&response_type=code&scope=identify`;
 
   return `<!doctype html>
@@ -226,44 +241,43 @@ function escapeHtml(s) {
 // Home page: read cookie, if logged in fetch small user info from DB + Discord API to show username discriminator
 app.get('/', async (req, res) => {
   const discordId = req.cookies.discord_id;
+  const baseUrl = getBaseUrl(req);
   if (!discordId) {
-    res.send(renderHomeHtml(null));
+    res.send(renderHomeHtml(null, baseUrl, DISCORD_CLIENT_ID));
     return;
   }
 
-  const client = await pool.connect();
   try {
-    const r = await client.query("SELECT discord_id, points FROM users WHERE discord_id = $1", [discordId]);
-    if (r.rowCount === 0) {
+    const r = await db.get("SELECT discord_id, points FROM users WHERE discord_id = ?", [discordId]);
+    if (!r) {
       // session cookie but no DB row => create starter row with 10 points
-      await client.query("INSERT INTO users (discord_id, points, messages) VALUES ($1, $2, $3)", [discordId, 10, 0]);
+      await db.run("INSERT INTO users (discord_id, points, messages) VALUES (?, ?, ?)", [discordId, 10, 0]);
       const userObj = { discord_id: discordId, points: 10, username: 'Discord User', discriminator: '' };
-      res.send(renderHomeHtml(userObj));
+      res.send(renderHomeHtml(userObj, baseUrl, DISCORD_CLIENT_ID));
       return;
     }
-    const points = r.rows[0].points;
+    const points = r.points;
 
-    // fetch display name from Discord to show e.g. username#discrim (best-effort)
+    // fetch display name from local meta table if present (best-effort)
     let username = null;
     try {
-      // if you had a token saved you'd fetch /users/@me; we don't store token; so we'll just display ID
-      // Optionally you could store username during OAuth exchange (we do that below)
-      const metaR = await client.query("SELECT username, discriminator FROM users_meta WHERE discord_id = $1", [discordId]);
-      if (metaR && metaR.rowCount > 0) {
-        username = metaR.rows[0].username + '#' + metaR.rows[0].discriminator;
+      const metaR = await db.get("SELECT username, discriminator FROM users_meta WHERE discord_id = ?", [discordId]);
+      if (metaR) {
+        username = metaR.username + (metaR.discriminator ? '#' + metaR.discriminator : '');
       }
     } catch(e){ /* ignore */ }
 
     const userObj = { discord_id: discordId, points, username: username || ('User ' + discordId), discriminator: '' };
-    res.send(renderHomeHtml(userObj));
-  } finally {
-    client.release();
+    res.send(renderHomeHtml(userObj, baseUrl, DISCORD_CLIENT_ID));
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Server error');
   }
 });
 
 // Redirect to Discord OAuth (optional convenience endpoint)
 app.get('/auth/login', (req, res) => {
-  const redirect = encodeURIComponent(`${WEBSITE_URL}/auth/callback`);
+  const redirect = encodeURIComponent(`${getBaseUrl(req)}/auth/callback`);
   const url = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${redirect}&response_type=code&scope=identify`;
   res.redirect(url);
 });
@@ -279,7 +293,7 @@ app.get('/auth/callback', async (req, res) => {
     params.append('client_secret', DISCORD_CLIENT_SECRET);
     params.append('grant_type', 'authorization_code');
     params.append('code', code);
-    params.append('redirect_uri', `${WEBSITE_URL}/auth/callback`);
+    params.append('redirect_uri', `${getBaseUrl(req)}/auth/callback`);
     params.append('scope', 'identify');
 
     const tokenResp = await fetch('https://discord.com/api/oauth2/token', {
@@ -302,45 +316,22 @@ app.get('/auth/callback', async (req, res) => {
       return res.status(500).send('OAuth error (fetch user).');
     }
 
-    const client = await pool.connect();
-    try {
-      // ensure users table exists
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS users (
-          discord_id BIGINT PRIMARY KEY,
-          points INTEGER NOT NULL DEFAULT 0,
-          messages INTEGER NOT NULL DEFAULT 0,
-          created_at TIMESTAMPTZ DEFAULT now()
-        );
-      `);
-      // optional small meta table to store username/discriminator for display
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS users_meta (
-          discord_id BIGINT PRIMARY KEY,
-          username TEXT,
-          discriminator TEXT
-        );
-      `);
-
-      // if new user -> give starter 10 points
-      const r = await client.query("SELECT * FROM users WHERE discord_id = $1", [userData.id]);
-      if (r.rowCount === 0) {
-        await client.query("INSERT INTO users (discord_id, points, messages) VALUES ($1, $2, $3)", [userData.id, 10, 0]);
-      }
-      // upsert meta
-      await client.query(`
-        INSERT INTO users_meta (discord_id, username, discriminator) VALUES ($1, $2, $3)
-        ON CONFLICT (discord_id) DO UPDATE SET username = EXCLUDED.username, discriminator = EXCLUDED.discriminator
-      `, [userData.id, userData.username, userData.discriminator]);
-
-      // set cookie session
-      setSessionCookie(res, userData.id);
-
-      // redirect home
-      res.redirect('/');
-    } finally {
-      client.release();
+    // if new user -> give starter 10 points
+    const r = await db.get("SELECT * FROM users WHERE discord_id = ?", [userData.id]);
+    if (!r) {
+      await db.run("INSERT INTO users (discord_id, points, messages) VALUES (?, ?, ?)", [userData.id, 10, 0]);
     }
+    // upsert meta
+    await db.run(`
+      INSERT INTO users_meta (discord_id, username, discriminator) VALUES (?, ?, ?)
+      ON CONFLICT(discord_id) DO UPDATE SET username=excluded.username, discriminator=excluded.discriminator
+    `, [userData.id, userData.username, userData.discriminator]);
+
+    // set cookie session
+    setSessionCookie(res, userData.id);
+
+    // redirect home
+    res.redirect('/');
   } catch (err) {
     console.error(err);
     res.status(500).send('Server error during OAuth.');
@@ -351,11 +342,9 @@ app.get('/auth/callback', async (req, res) => {
 app.get('/api/user', async (req, res) => {
   const discordId = req.cookies.discord_id;
   if (!discordId) return res.json({});
-  const client = await pool.connect();
   try {
-    const r = await client.query("SELECT u.discord_id, u.points, u.messages, m.username, m.discriminator FROM users u LEFT JOIN users_meta m ON u.discord_id = m.discord_id WHERE u.discord_id = $1", [discordId]);
-    if (r.rowCount === 0) return res.json({});
-    const row = r.rows[0];
+    const row = await db.get("SELECT u.discord_id, u.points, u.messages, m.username, m.discriminator FROM users u LEFT JOIN users_meta m ON u.discord_id = m.discord_id WHERE u.discord_id = ?", [discordId]);
+    if (!row) return res.json({});
     res.json({
       discord_id: row.discord_id,
       points: row.points,
@@ -363,8 +352,9 @@ app.get('/api/user', async (req, res) => {
       username: row.username || null,
       discriminator: row.discriminator || null
     });
-  } finally {
-    client.release();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({});
   }
 });
 
@@ -377,11 +367,11 @@ app.post('/api/planko', async (req, res) => {
   const bet = Number(betRaw);
   if (!bet || isNaN(bet) || bet <= 0) return res.status(400).json({ error: 'Invalid bet amount.' });
 
-  const client = await pool.connect();
   try {
-    const r = await client.query("SELECT points FROM users WHERE discord_id = $1 FOR UPDATE", [discordId]);
-    if (r.rowCount === 0) return res.status(400).json({ error: 'User not found.' });
-    let points = r.rows[0].points;
+    // transaction-like locking emulation: get current points, then update
+    const r = await db.get("SELECT points FROM users WHERE discord_id = ?", [discordId]);
+    if (!r) return res.status(400).json({ error: 'User not found.' });
+    let points = r.points;
 
     if (bet > points) return res.status(400).json({ error: 'Insufficient points.' });
 
@@ -398,8 +388,8 @@ app.post('/api/planko', async (req, res) => {
     const change = won - bet; // can be negative (if lose)
     const newPoints = points - bet + Math.max(0, won);
 
-    // atomic update
-    await client.query("UPDATE users SET points = $1 WHERE discord_id = $2", [newPoints, discordId]);
+    // atomic-ish update
+    await db.run("UPDATE users SET points = ? WHERE discord_id = ?", [newPoints, discordId]);
 
     res.json({
       outcome,
@@ -410,8 +400,6 @@ app.post('/api/planko', async (req, res) => {
   } catch (err) {
     console.error('Planko error', err);
     res.status(500).json({ error: 'Server error.' });
-  } finally {
-    client.release();
   }
 });
 
@@ -421,8 +409,8 @@ app.get('/auth/logout', (req, res) => {
   res.redirect('/');
 });
 
-// start server
-app.listen(PORT, () => {
-  console.log(`Halloween Planko single-file app running on port ${PORT}`);
-  console.log(`Make sure your Discord Redirect URI is: ${WEBSITE_URL}/auth/callback`);
+// start server on fixed port for local runs
+app.listen(3000, () => {
+  console.log(`Halloween Planko single-file app running on port 3000`);
+  console.log(`Make sure your Discord Redirect URI is set to your deployment URL + /auth/callback`);
 });
