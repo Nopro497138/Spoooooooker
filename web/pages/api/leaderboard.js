@@ -1,12 +1,10 @@
 // web/pages/api/leaderboard.js
-// Returns top-10 leaderboard from JSON DB.
-
 const { getDb } = require('../../lib/db');
 
 export default async function handler(req, res) {
   try {
     const db = await getDb();
-    const rows = await db.getLeaderboard(10);
+    const rows = await db.getLeaderboard(20);
     const list = rows.map(r => ({
       discord_id: r.discord_id,
       points: r.points,
