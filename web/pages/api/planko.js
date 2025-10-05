@@ -1,5 +1,5 @@
 // web/pages/api/planko.js
-// Plays Planko for the logged-in user. Performs validation and updates the DB.
+// Plays Planko for the logged-in user. Validation + updates JSON DB.
 
 const cookie = require('cookie');
 const { getDb } = require('../../lib/db');
@@ -20,11 +20,9 @@ export default async function handler(req, res) {
 
   try {
     const db = await getDb();
-
-    // "FOR UPDATE" not available — emulate by reading + updating synchronously
-    const r = await db.get('SELECT points FROM users WHERE discord_id = ?', [discordId]);
+    const r = await db.getUser(discordId);
     if (!r) return res.status(400).json({ error: 'User not found.' });
-    let points = Number(r.points);
+    let points = Number(r.points || 0);
 
     if (bet > points) return res.status(400).json({ error: 'Insufficient points.' });
 
@@ -41,7 +39,7 @@ export default async function handler(req, res) {
     const change = won - bet;
     const newPoints = points - bet + Math.max(0, won);
 
-    await db.run('UPDATE users SET points = ? WHERE discord_id = ?', [newPoints, discordId]);
+    await db.updatePoints(discordId, newPoints);
 
     res.json({ outcome, multiplier, change, newPoints });
   } catch (err) {
