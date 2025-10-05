@@ -1,6 +1,4 @@
 // web/pages/api/logout.js
-// Clears the session cookie and redirects to home.
-
 const cookie = require('cookie');
 
 export default function handler(req, res) {
