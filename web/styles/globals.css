@@ -1,43 +1,68 @@
 /* web/styles/globals.css */
-/* Global styles, responsive, galaxy + halloween vibes */
+/* ... (preserve previous styles) ... */
+/* Replaced with full file including animations and transitions */
 
+/* base variables */
 :root{
-  --bg-1: #06060a;
-  --bg-2: #0d0d14;
+  --bg-1: #040410;
+  --bg-2: #0f0f11;
   --accent: #9b59ff;
   --accent-2: #ff6b6b;
   --muted: rgba(230,230,230,0.6);
-  --card: rgba(255,255,255,0.02);
 }
 
+/* reset & body */
 *{box-sizing:border-box}
 html,body,#__next{height:100%}
 body{
   margin:0;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-  background:
-    radial-gradient(ellipse at 10% 10%, rgba(155,89,255,0.06) 0%, transparent 15%),
-    radial-gradient(ellipse at 90% 90%, rgba(255,107,107,0.04) 0%, transparent 18%),
-    linear-gradient(180deg, var(--bg-1), var(--bg-2));
+  background: radial-gradient(ellipse at 10% 10%, rgba(155,89,255,0.06) 0%, transparent 15%),
+              radial-gradient(ellipse at 90% 90%, rgba(255,107,107,0.04) 0%, transparent 18%),
+              linear-gradient(180deg, var(--bg-1), var(--bg-2));
   color:#e8e8ee;
   -webkit-font-smoothing:antialiased;
   -moz-osx-font-smoothing:grayscale;
-  padding:0;
+  overflow-y: auto;
+  animation: bg-pulse 8s ease-in-out infinite;
 }
 
-/* subtle stars background */
+/* animated starfield */
 body::before{
   content:"";
-  position:fixed;inset:0;
+  position:fixed;inset:0; z-index:-1;
   background-image:
     radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.06) 100%, transparent 0),
     radial-gradient(1px 1px at 30% 60%, rgba(255,255,255,0.05) 100%, transparent 0),
     radial-gradient(1px 1px at 70% 30%, rgba(255,255,255,0.04) 100%, transparent 0),
     radial-gradient(1px 1px at 80% 80%, rgba(255,255,255,0.03) 100%, transparent 0);
-  opacity:0.6;pointer-events:none;mix-blend-mode:screen;
+  opacity:0.7;pointer-events:none;mix-blend-mode:screen;
+  animation: stars-move 30s linear infinite;
 }
 
-/* container */
+/* subtle spiderweb decorative */
+body::after{
+  content:"";
+  position:fixed; right:0; top:0; width:320px; height:320px; pointer-events:none;
+  background-image: radial-gradient(circle at 10% 10%, rgba(255,255,255,0.01), transparent 20%),
+                    linear-gradient(135deg, rgba(255,255,255,0.01), transparent 30%);
+  opacity:0.12;
+  transform: rotate(12deg);
+}
+
+/* keyframes */
+@keyframes bg-pulse {
+  0% { filter: hue-rotate(0deg); }
+  50% { filter: hue-rotate(6deg) saturate(1.02); }
+  100% { filter: hue-rotate(0deg); }
+}
+@keyframes stars-move {
+  0% { transform: translateY(0px); opacity:0.7 }
+  50% { transform: translateY(-30px); opacity:0.85 }
+  100% { transform: translateY(0px); opacity:0.7 }
+}
+
+/* container & cards */
 .container {
   max-width:1100px;
   margin:28px auto;
@@ -45,16 +70,22 @@ body::before{
   display:grid;
   grid-template-columns: 1fr 360px;
   gap:20px;
+  animation: page-entrance 550ms ease;
+}
+@keyframes page-entrance {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* cards */
 .card {
   background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
   border: 1px solid rgba(255,255,255,0.04);
   padding:18px;
   border-radius:12px;
   box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  transition: transform 220ms ease, box-shadow 220ms ease;
 }
+.card:hover { transform: translateY(-6px); box-shadow: 0 18px 60px rgba(0,0,0,0.6); }
 
 /* navbar */
 .navbar {
@@ -73,54 +104,60 @@ body::before{
   backdrop-filter: blur(6px);
 }
 .nav-left{display:flex;align-items:center;gap:12px}
-.logo {
-  display:flex;align-items:center;gap:10px;font-weight:800;color:var(--accent);
-  text-decoration:none;
-}
-.logo .brand { font-size:18px; letter-spacing:1px }
-.logo .sub { font-size:12px; color:var(--muted) }
+.logo { display:flex;align-items:center;gap:10px;font-weight:800;color:var(--accent); text-decoration:none; transition: transform 260ms ease; }
+.logo:hover { transform: scale(1.02); }
+.logo svg { transform-origin:center; animation: logo-bob 4s ease-in-out infinite; }
+@keyframes logo-bob { 0%{transform:translateY(0)}50%{transform:translateY(-4px)}100%{transform:translateY(0)} }
 
-.nav-links { display:flex; gap:12px; align-items:center; }
-.nav-links a { color: #ddd; text-decoration:none; padding:8px 10px; border-radius:8px; font-weight:600; font-size:14px }
+.nav-links { display:flex; gap:12px; align-items:center; margin-left:12px; }
+.nav-links a { color: #ddd; text-decoration:none; padding:8px 10px; border-radius:8px; font-weight:600; font-size:14px; transition: background 220ms, color 220ms; }
 .nav-links a.active, .nav-links a:hover { background: rgba(255,255,255,0.02); color: #fff; box-shadow: 0 6px 20px rgba(0,0,0,0.45) }
 
 .nav-right { display:flex; gap:12px; align-items:center; }
 
+/* points badge & discord button with animation */
 .points-badge {
   background: linear-gradient(180deg,var(--accent), #7a3bff);
   color:#0b0b14; font-weight:800; padding:8px 12px; border-radius:999px; min-width:92px; text-align:center;
   box-shadow: 0 8px 24px rgba(155,89,255,0.12);
   display:flex; align-items:center; gap:8px;
+  transform-origin:center; transition: transform 220ms ease;
 }
+.points-badge:hover { transform: translateY(-3px); }
 
 .discord-btn {
   display:inline-flex; align-items:center; gap:10px; padding:10px 14px; border-radius:10px; cursor:pointer;
   text-decoration:none; color:#fff; font-weight:800; background: linear-gradient(180deg,#6b4bff,#4a22ff);
   box-shadow: 0 8px 24px rgba(74,34,255,0.12);
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+.discord-btn:hover { transform: translateY(-4px); box-shadow: 0 18px 40px rgba(74,34,255,0.2); }
+
+/* icons */
+.icon {
+  width:18px;height:18px;display:inline-block;vertical-align:middle;
 }
 
-/* content styles */
-h1,h2,h3,h4{margin:0}
-.lead{color:var(--muted); margin-top:8px}
-
-/* game UI */
-.game-row { display:flex; gap:12px; align-items:center; margin-top:12px; flex-wrap:wrap }
+/* interactive elements */
 .input, .select {
-  padding:12px;border-radius:10px;background:transparent;border:1px solid rgba(255,255,255,0.06);color:#fff;font-size:16px;
+  padding:12px;border-radius:10px;background:transparent;border:1px solid rgba(255,255,255,0.06);color:#fff;font-size:16px; transition: box-shadow 180ms ease, transform 120ms ease;
 }
+.input:focus, .select:focus { box-shadow: 0 8px 30px rgba(0,0,0,0.45); transform: translateY(-2px); outline:none; }
+
+/* buttons */
 .btn {
-  padding:12px 16px;border-radius:12px;background:linear-gradient(180deg,#ff8b8b,#ff5252);border:none;color:#111;font-weight:800;cursor:pointer;
+  padding:12px 16px;border-radius:12px;background:linear-gradient(180deg,#ff8b8b,#ff5252);border:none;color:#111;font-weight:800;cursor:pointer; transition: transform 160ms ease, box-shadow 160ms ease;
 }
-.btn.secondary{
-  background: linear-gradient(180deg,#6b4bff,#4a22ff); color:#fff;
-}
+.btn:hover { transform: translateY(-4px); box-shadow: 0 18px 40px rgba(255,82,82,0.16); }
+.btn.secondary { background: linear-gradient(180deg,#6b4bff,#4a22ff); color:#fff; }
 
-/* slot machine visuals */
+/* slot & planko visuals (keep previous but smoother) */
 .slot-stage { display:flex; gap:8px; align-items:center; justify-content:center; margin-top:18px; }
-.reel { width:86px; height:120px; border-radius:8px; overflow:hidden; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.03); display:flex; flex-direction:column; align-items:center; justify-content:center; }
-.reel .symbol { font-size:32px; line-height:120px; width:100%; text-align:center; }
+.reel { width:86px; height:120px; border-radius:8px; overflow:hidden; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.03); display:flex; flex-direction:column; align-items:center; justify-content:center; transition: transform 260ms cubic-bezier(.2,.9,.2,1); }
+.reel.spin { transform: translateY(-8px) scale(1.02); box-shadow: 0 18px 40px rgba(0,0,0,0.5); }
+.reel .symbol { font-size:32px; line-height:120px; width:100%; text-align:center; user-select:none; }
 
-/* planko visuals */
+/* planko */
 .planko-board { width:100%; height:300px; background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00)); border-radius:12px; margin-top:12px; position:relative; overflow:hidden; border:1px solid rgba(255,255,255,0.03) }
 
 /* small helpers */
