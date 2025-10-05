@@ -1,7 +1,7 @@
 // web/pages/api/shop/purchase.js
 const cookie = require('cookie')
-const { getDb } = require('../../lib/db')
-const PRODUCTS = require('../../data/products')
+const { getDb } = require('../../lib/db.js')
+const PRODUCTS = require('../../data/products.js')
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
