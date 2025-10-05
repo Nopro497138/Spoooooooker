@@ -1,37 +1,62 @@
 // web/pages/games/index.js
-import NavBar from '../../components/NavBar';
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import NavBar from '../../components/NavBar'
+import Link from 'next/link'
+import { useEffect, useState } from 'react'
 
 export default function Games() {
-  const [user, setUser] = useState(null);
-  useEffect(()=> {
-    fetch('/api/user').then(r=>r.json()).then(d => { if (d && d.discord_id) setUser(d); });
-  }, []);
+  const [user, setUser] = useState(null)
 
+  useEffect(() => {
+    let mounted = true
+    fetch('/api/user').then(r => r.json()).then(j => {
+      if (!mounted) return
+      setUser(j && j.discord_id ? j : null)
+    }).catch(()=>setUser(null))
+    return ()=> mounted = false
+  },[])
+
+  // If not logged in show nothing but login CTA
   if (!user) {
     return (
-      <div className="container">
+      <>
         <NavBar />
-        <div className="card" style={{ padding:40, textAlign:'center' }}>
-          <h3 style={{ color:'#ffb4ff' }}>Sign in to access Games</h3>
-          <a href="/api/auth/login" className="btn" style={{ background:'linear-gradient(180deg,#6b2eff,#9a5bff)', color:'#fff' }}>Sign in with Discord</a>
-        </div>
-      </div>
-    );
+        <main style={{minHeight:'calc(100vh - 64px)', display:'flex', alignItems:'center', justifyContent:'center'}}>
+          <div className="card center" style={{flexDirection:'column', gap:12, padding:28}}>
+            <h2 style={{color:'var(--accent)'}}>Sign in to access Games</h2>
+            <p className="small">You must be logged in with Discord to play.</p>
+            <a className="discord-btn" href="/api/auth/login">Sign in with Discord</a>
+          </div>
+        </main>
+      </>
+    )
   }
 
   return (
-    <div className="container">
+    <>
       <NavBar />
-      <div className="card">
-        <h2 style={{ marginTop:0, color:'#ffb4ff' }}>Games</h2>
-        <p className="small">Choose a game. Each game uses your Halloween Points.</p>
-        <div style={{ display:'flex', gap:12, flexWrap:'wrap', marginTop:12 }}>
-          <Link href="/games/planko"><a className="btn">Planko</a></Link>
-          <Link href="/games/slot"><a className="btn">Slot Machine</a></Link>
+      <div className="container" style={{alignItems:'start'}}>
+        <div className="card">
+          <h2>Games</h2>
+          <p className="small" style={{marginTop:8}}>Choose a game below. Your points are shown in the top-right.</p>
+
+          <div style={{display:'grid', gap:12, marginTop:14}}>
+            <Link href="/games/planko"><a className="card" style={{display:'block', textDecoration:'none', color:'inherit'}}>
+              <h3>Planko</h3>
+              <p className="small">Drop the ball and land on a multiplier. Classic and spooky!</p>
+            </a></Link>
+
+            <Link href="/games/slot"><a className="card" style={{display:'block', textDecoration:'none', color:'inherit'}}>
+              <h3>Slot Machine</h3>
+              <p className="small">Spin 3 reels. Match symbols to win multipliers and prizes.</p>
+            </a></Link>
+          </div>
         </div>
+
+        <aside className="card">
+          <h4>Leaderboard</h4>
+          <p className="small">Top players are visible on the home page and updated after each game.</p>
+        </aside>
       </div>
-    </div>
-  );
+    </>
+  )
 }
