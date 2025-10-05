@@ -1,6 +1,5 @@
 // web/pages/api/auth/callback.js
 // Exchanges OAuth code, fetches Discord user, upserts into JSON DB and sets cookie.
-// Uses global fetch (Next.js provides it in modern environments).
 
 const cookie = require('cookie');
 const { getDb } = require('../../../lib/db');
@@ -20,9 +19,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    const proto = req.headers['x-forwarded-proto'] || 'https';
-    const host = req.headers['x-forwarded-host'] || req.headers.host;
-    const redirect_uri = `${proto}://${host}/api/auth/callback`;
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || null;
+    let redirect_uri;
+    if (siteUrl) {
+      redirect_uri = `${siteUrl.replace(/\/$/, '')}/api/auth/callback`;
+    } else {
+      const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+      const host = req.headers['x-forwarded-host'] || req.headers.host;
+      redirect_uri = `${proto}://${host}/api/auth/callback`;
+    }
 
     const params = new URLSearchParams();
     params.append('client_id', DISCORD_CLIENT_ID);
@@ -54,12 +59,10 @@ export default async function handler(req, res) {
       return;
     }
 
-    // Upsert in JSON DB
     const db = await getDb();
-    await db.addUserIfNotExist(userData.id, 10); // starter 10 points if new
+    await db.addUserIfNotExist(userData.id, 10);
     await db.upsertMeta(userData.id, userData.username, userData.discriminator);
 
-    // set cookie
     const isProd = process.env.NODE_ENV === 'production';
     const cookieStr = cookie.serialize('discord_id', String(userData.id), {
       httpOnly: true,
