@@ -1,6 +1,5 @@
 // web/lib/db.js
-// Simple JSON-backed "DB" to avoid native sqlite dependencies.
-// Uses an in-memory cache + atomic writes to data.json and a write queue to avoid races.
+// JSON-backed DB to avoid native modules. Simple, atomic writes + in-memory cache.
 
 const fs = require('fs');
 const fsp = fs.promises;
@@ -18,15 +17,13 @@ async function loadIfNeeded() {
     const raw = await fsp.readFile(DB_PATH, 'utf8');
     cache = JSON.parse(raw);
   } catch (err) {
-    // if file doesn't exist or is invalid, start fresh
     cache = { users: {} };
-    await flush(); // ensure file created
+    await flush();
   }
   return cache;
 }
 
 async function flush() {
-  // queue up writes so concurrent calls don't stomp each other
   if (writeInProgress) {
     pendingWrite = true;
     return;
@@ -40,7 +37,6 @@ async function flush() {
     writeInProgress = false;
     if (pendingWrite) {
       pendingWrite = false;
-      // schedule next write microtask
       setImmediate(() => flush());
     }
   }
@@ -58,7 +54,6 @@ async function getDb() {
       await loadIfNeeded();
       const u = cache.users[String(discordId)];
       if (!u) return null;
-      // return a shallow clone to avoid accidental mutation
       return { ...u };
     },
 
