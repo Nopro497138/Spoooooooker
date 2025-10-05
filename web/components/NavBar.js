@@ -17,16 +17,11 @@ export default function NavBar() {
 
   return (
     <nav className="navbar" role="navigation" aria-label="Main navigation">
-      <div className="nav-left">
-        <Link href="/"><a className="logo" aria-label="Spoooooooker Home">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" style={{filter:'drop-shadow(0 6px 18px rgba(0,0,0,0.5)'}}>
-            <rect x="0.5" y="0.5" width="23" height="23" rx="6" fill="#190627" stroke="rgba(255,255,255,0.02)"/>
-            <path d="M6 8c1.2-2 6-2 9 0 0 0-1.5 3-4.5 3S6 8 6 8z" fill="#ff8b8b" opacity="0.95"/>
-            <circle cx="12" cy="12" r="3.5" fill="#9b59ff" />
-          </svg>
-          <div>
-            <div className="brand">spoooooooker</div>
-            <div className="sub">galaxy • halloween</div>
+      <div className="nav-left" style={{alignItems:'center', gap:12}}>
+        <Link href="/"><a className="logo" aria-label="Spoooooooker Home" style={{textDecoration:'none'}}>
+          <div style={{display:'flex', flexDirection:'column', lineHeight:1}}>
+            <div className="brand" style={{fontSize:18, color:'var(--accent)'}}>spoooooooker</div>
+            <div className="sub" style={{fontSize:12}}>galaxy • halloween</div>
           </div>
         </a></Link>
 
@@ -52,9 +47,9 @@ export default function NavBar() {
           </>
         ) : (
           <a className="discord-btn" href="/api/auth/login" title="Sign in with Discord" aria-label="Sign in with Discord">
-            {/* official Discord glyph simplified, purple gradient background */}
-            <svg className="icon" viewBox="0 0 71 55" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-              <path d="M60.8 4.6C54.7 1.8 48.2.6 41.7.6c-1 .6-2 1.4-2.9 2.2-5.3 0-10.7.1-16 0-.9-.9-1.8-1.6-2.8-2.1C22.7.5 14.8 1.3 8.5 4.6c-6.2 3.2-9.4 8.4-9.6 14.4-.4 6.9.9 13.6 3.3 20.1 7 3.8 14 6.1 20.9 7.7 1.4-1.8 2.8-3.6 4.2-5.4-3.9-1.1-7.7-2.6-11-5.1 0 0 2.1 1.2 12.8 6.2 10.2 4.9 19.5 6.1 28.2 2.5 2.5-6.8 3.8-13.6 3.4-20.5-.2-6.1-3.4-11.3-9.6-14.5z" fill="#fff" opacity="0.95"/>
+            {/* purple rounded Discord glyph */}
+            <svg className="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style={{display:'block'}}>
+              <path d="M20.317 4.369A19.791 19.791 0 0 0 15.536 3c-.2.356-.432.82-.593 1.184-1.776-.266-3.549-.266-5.277 0-.16-.365-.392-.828-.593-1.185A19.736 19.736 0 0 0 3.684 4.37C1.63 9.19.653 13.951 1.109 18.668c2.035 1.489 4.011 2.426 5.935 3.05 1.286.405 2.506.68 3.654.85 1.142.169 2.156.255 3.02.255.863 0 1.878-.086 3.02-.255 1.148-.17 2.368-.445 3.654-.85 1.924-.624 3.9-1.561 5.935-3.05.459-4.717-.52-9.478-2.574-14.299z" fill="#fff"/>
             </svg>
             Sign in
           </a>
