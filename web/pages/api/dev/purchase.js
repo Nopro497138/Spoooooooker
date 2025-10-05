@@ -1,5 +1,5 @@
 // web/pages/api/dev/purchases.js
-const { getDb } = require('../../lib/db')
+const { getDb } = require('../../lib/db.js')
 const cookie = require('cookie')
 
 export default async function handler(req, res) {
