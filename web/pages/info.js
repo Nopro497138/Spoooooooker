@@ -12,30 +12,30 @@ export default function Info() {
 
           <section style={{marginTop:16}}>
             <h3>1) Sign in</h3>
-            <p className="small">Click the Sign in button in the top-right. This uses Discord OAuth to link your account (we only store minimal info to show your username and points).</p>
+            <p className="small">Click Sign in (top-right). This links your Discord account to show your username and points.</p>
           </section>
 
           <section style={{marginTop:12}}>
             <h3>2) Earn Halloween Points</h3>
-            <p className="small">Earn points by interacting on Discord (e.g. events, custom logic). Points are used for playing games and buying items in the shop.</p>
+            <p className="small">Start with 50 Halloween Points. Earn more via Discord events and gameplay.</p>
           </section>
 
           <section style={{marginTop:12}}>
             <h3>3) Play Games</h3>
-            <p className="small">Open <strong>Games</strong>. You can play <em>Planko</em> (ball drop, multipliers) or <em>Slot Machine</em>. Set a bet, press play and enjoy animations and results. Wins update your points immediately.</p>
+            <p className="small">Open <strong>Games</strong>. Play <em>Planko</em> (ball drop) or <em>Slot Machine</em>. Place a bet, enjoy animations and see immediate results.</p>
           </section>
 
           <section style={{marginTop:12}}>
             <h3>Privacy</h3>
-            <p className="small">We only use your Discord ID and username to identify you. No sensitive data is collected. For production use a hosted database is recommended.</p>
+            <p className="small">We use your Discord ID and username to identify you. No sensitive personal data is collected via this site.</p>
           </section>
         </div>
 
         <aside className="card" style={{height:'fit-content'}}>
           <h3>Tips</h3>
           <ul className="small">
-            <li>Use the site on iPad for the best experience.</li>
-            <li>Leaderboard shows top players and updates after each game.</li>
+            <li>Use iPad for best experience.</li>
+            <li>Leaderboard updates after each game.</li>
             <li>Have fun and be spooky 👻</li>
           </ul>
         </aside>
