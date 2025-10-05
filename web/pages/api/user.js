@@ -1,5 +1,5 @@
 // web/pages/api/user.js
-// Returns small user payload based on cookie (discord_id)
+// Return small user payload based on session cookie
 
 const cookie = require('cookie');
 const { getDb } = require('../../lib/db');
