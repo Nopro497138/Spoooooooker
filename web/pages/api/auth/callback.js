@@ -1,8 +1,8 @@
 // web/pages/api/auth/callback.js
 // Exchanges the OAuth code for a token, fetches the Discord user,
 // upserts them into the local DB and sets a secure HttpOnly cookie.
+// Uses global fetch (no node-fetch) and the local sqlite wrapper.
 
-const fetch = require('node-fetch');
 const cookie = require('cookie');
 const { getDb } = require('../../../lib/db');
 
@@ -34,7 +34,8 @@ export default async function handler(req, res) {
     params.append('redirect_uri', redirect_uri);
     params.append('scope', 'identify');
 
-    const tokenResp = await fetch('https://discord.com/api/oauth2/token', {
+    // use global fetch available in modern Node/Next environments
+    const tokenResp = await globalThis.fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       body: params,
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
@@ -46,7 +47,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    const userResp = await fetch('https://discord.com/api/users/@me', {
+    const userResp = await globalThis.fetch('https://discord.com/api/users/@me', {
       headers: { Authorization: `Bearer ${tokenData.access_token}` }
     });
     const userData = await userResp.json();
@@ -62,7 +63,7 @@ export default async function handler(req, res) {
     if (!existing) {
       await db.run('INSERT INTO users (discord_id, points, messages) VALUES (?, ?, ?)', [userData.id, 10, 0]);
     }
-    // upsert meta
+    // upsert meta — SQLite UPSERT (excluded) syntax
     await db.run(`
       INSERT INTO users_meta (discord_id, username, discriminator) VALUES (?, ?, ?)
       ON CONFLICT(discord_id) DO UPDATE SET username = excluded.username, discriminator = excluded.discriminator
