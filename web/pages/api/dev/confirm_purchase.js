@@ -1,9 +1,8 @@
 // web/pages/api/dev/confirm_purchase.js
+const { getDb } = require('../../../lib/db')
 const cookie = require('cookie')
-const { getDb } = require('../../lib/db')
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
   const cookies = req.headers.cookie ? cookie.parse(req.headers.cookie) : {}
   const discordId = cookies.discord_id
   const OWNER_ID = process.env.OWNER_ID || process.env.BOT_OWNER_ID || null
