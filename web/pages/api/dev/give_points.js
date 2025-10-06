@@ -1,5 +1,5 @@
 // web/pages/api/dev/give_points.js
-const { getDb } = require('../../lib/db')
+const { getDb } = require('../../../lib/db')
 const cookie = require('cookie')
 
 export default async function handler(req, res) {
@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   if (!target || !amount) return res.status(400).json({ error: 'Missing fields' })
   try {
     const db = await getDb()
-    const updated = await db.givePoints(target, Number(amount), `dev_grant_by_${discordId}`)
+    const updated = await db.giveCandy(target, Number(amount), `dev_grant_by_${discordId}`)
     res.json({ ok: true, updated })
   } catch (err) {
     console.error('dev give_points', err)
