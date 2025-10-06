@@ -29,12 +29,11 @@ export default function Shop() {
   }
 
   async function buy(product) {
-    if (!confirm(`Buy ${product.name} for ${product.price} points?`)) return
+    if (!confirm(`Buy ${product.name} for ${product.price} Halloween candy?`)) return
     const res = await fetch('/api/shop/purchase', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ productId: product.id }) })
     const j = await res.json()
     if (j.error) alert('Error: ' + j.error)
     else alert('Purchase recorded. Developer will confirm it soon.')
-    // refresh points
     fetch('/api/user').then(r=>r.json()).then(j=>setUser(j))
   }
 
@@ -44,7 +43,7 @@ export default function Shop() {
       <div className="container" style={{alignItems:'start'}}>
         <div className="card">
           <h2>Shop</h2>
-          <p className="small" style={{marginTop:8}}>Spend your Halloween Points on cosmetics and upgrades. Purchases are recorded and can be confirmed by the site owner.</p>
+          <p className="small" style={{marginTop:8}}>Spend your Halloween candy on cosmetics and upgrades. Purchases are recorded and can be confirmed by the site owner.</p>
 
           <div style={{display:'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap:12, marginTop:12}}>
             {products.map(p => (
@@ -54,7 +53,7 @@ export default function Shop() {
                   <p className="small">{p.description}</p>
                 </div>
                 <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:12}}>
-                  <div style={{fontWeight:800, color:'var(--accent)'}}>{p.price} pts</div>
+                  <div style={{fontWeight:800, color:'var(--accent)'}}>{p.price} candy</div>
                   <button className="btn" onClick={()=>buy(p)}>Buy</button>
                 </div>
               </div>
@@ -64,7 +63,7 @@ export default function Shop() {
 
         <aside className="card">
           <h4>Your balance</h4>
-          <div style={{marginTop:8}} className="small">You have <strong style={{color:'var(--accent)'}}>{user ? user.points : 0}</strong> points.</div>
+          <div style={{marginTop:8}} className="small">You have <strong style={{color:'var(--accent)'}}>{user ? user.candy : 0}</strong> Halloween candy.</div>
           <p className="small" style={{marginTop:12}}>Purchases will be visible to the owner for confirmation.</p>
         </aside>
       </div>
