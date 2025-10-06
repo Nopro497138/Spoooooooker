@@ -1,5 +1,4 @@
 # main.py
-# bot.py
 import os
 import asyncio
 import aiosqlite
@@ -14,7 +13,7 @@ load_dotenv()
 # No DATABASE_URL — local sqlite used
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
-WEBSITE_URL = os.getenv("NEXT_PUBLIC_WEBSITE_URL") or os.getenv("WEBSITE_URL") or "https://your-site.vercel.app"
+WEBSITE_URL = os.getenv("NEXT_PUBLIC_WEBSITE_URL") or os.getenv("WEBSITE_URL") or "https://spoooooooker.vercel.app/"
 BOT_OWNER_ID = int(os.getenv("BOT_OWNER_ID")) if os.getenv("BOT_OWNER_ID") else None
 
 intents = discord.Intents.default()
@@ -31,16 +30,16 @@ EMBED_COLOR = discord.Color.from_rgb(255, 95, 95)  # Halloween-ish coral
 CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS users (
   discord_id INTEGER PRIMARY KEY,
-  points INTEGER NOT NULL DEFAULT 0,
+  candy INTEGER NOT NULL DEFAULT 0,
   messages INTEGER NOT NULL DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 """
 
 async def ensure_user(conn: aiosqlite.Connection, discord_id: int):
-    # On first sight give 50 starter points (matches website)
+    # On first sight give 50 starter candy
     await conn.execute("""
-        INSERT OR IGNORE INTO users (discord_id, points, messages)
+        INSERT OR IGNORE INTO users (discord_id, candy, messages)
         VALUES (?, 50, 0);
     """, (discord_id,))
     await conn.commit()
@@ -69,31 +68,31 @@ async def on_message(message: discord.Message):
 
     await ensure_user(db, message.author.id)
     # increment messages
-    cur = await db.execute("SELECT messages, points FROM users WHERE discord_id = ?", (message.author.id,))
+    cur = await db.execute("SELECT messages, candy FROM users WHERE discord_id = ?", (message.author.id,))
     rec = await cur.fetchone()
     if rec is None:
         # fallback ensure and fetch again
         await ensure_user(db, message.author.id)
-        cur = await db.execute("SELECT messages, points FROM users WHERE discord_id = ?", (message.author.id,))
+        cur = await db.execute("SELECT messages, candy FROM users WHERE discord_id = ?", (message.author.id,))
         rec = await cur.fetchone()
 
     messages = int(rec["messages"]) + 1
-    points = int(rec["points"])
+    candy = int(rec["candy"])
     await db.execute("UPDATE users SET messages = ? WHERE discord_id = ?", (messages, message.author.id))
     await db.commit()
 
-    # award 1 Halloween point every 50 messages
+    # award 1 Halloween candy every 50 messages
     if messages % 50 == 0:
-        points += 1
-        await db.execute("UPDATE users SET points = ? WHERE discord_id = ?", (points, message.author.id))
+        candy += 1
+        await db.execute("UPDATE users SET candy = ? WHERE discord_id = ?", (candy, message.author.id))
         await db.commit()
         embed = discord.Embed(
-            title="🎃 Halloween Point Awarded!",
-            description=f"Congrats {message.author.mention}, you reached **{messages} messages** and earned **1 Halloween Point**!",
+            title="🎃 Halloween Candy Awarded!",
+            description=f"Congrats {message.author.mention}, you reached **{messages} messages** and earned **1 Halloween Candy**!",
             color=EMBED_COLOR,
             timestamp=datetime.utcnow()
         )
-        embed.add_field(name="Total Points", value=str(points))
+        embed.add_field(name="Total Halloween Candy", value=str(candy))
         embed.set_footer(text="Keep chatting to earn more!")
         await message.channel.send(embed=embed)
 
@@ -104,27 +103,27 @@ async def on_message(message: discord.Message):
 async def info(interaction: discord.Interaction):
     embed = discord.Embed(
         title="👻 Halloween-Planko — Info",
-        description="Welcome! This bot tracks your messages and awards Halloween Points. Use them on the website to play games like Planko and the Slot Machine.",
+        description="Welcome! This bot tracks your messages and awards Halloween Candy. Use them on the website to play games like Planko and the Slot Machine.",
         color=EMBED_COLOR,
         timestamp=datetime.utcnow()
     )
     embed.add_field(name="Website", value=f"[Open Spoooooooker]({WEBSITE_URL})", inline=False)
-    embed.add_field(name="How to earn points", value="Send messages in any server where the bot has access. Every 50 messages = 1 Halloween Point.", inline=False)
-    embed.add_field(name="How to use points", value="Log into the website using Discord OAuth, your Discord account will be linked and your points synced. Spend points on Games and in the Shop.", inline=False)
+    embed.add_field(name="How to earn Halloween Candy", value="Send messages in any server where the bot has access. Every 50 messages = 1 Halloween Candy.", inline=False)
+    embed.add_field(name="How to use Halloween Candy", value="Log into the website using Discord OAuth, your Discord account will be linked and your Halloween Candy synced. Spend them on Games and in the Shop.", inline=False)
     embed.set_footer(text="Have fun — good luck!")
     await interaction.response.send_message(embed=embed)
 
 # Admin helper: show user status
-@tree.command(name="mystatus", description="Show your point & message count (private)")
+@tree.command(name="mystatus", description="Show your Halloween Candy & message count (private)")
 async def mystatus(interaction: discord.Interaction):
     if not db:
         await interaction.response.send_message("Database not ready.", ephemeral=True)
         return
 
     await ensure_user(db, interaction.user.id)
-    cur = await db.execute("SELECT points, messages FROM users WHERE discord_id = ?", (interaction.user.id,))
+    cur = await db.execute("SELECT candy, messages FROM users WHERE discord_id = ?", (interaction.user.id,))
     rec = await cur.fetchone()
-    points = int(rec["points"]) if rec and rec["points"] is not None else 0
+    candy = int(rec["candy"]) if rec and rec["candy"] is not None else 0
     messages = int(rec["messages"]) if rec and rec["messages"] is not None else 0
 
     embed = discord.Embed(
@@ -132,7 +131,7 @@ async def mystatus(interaction: discord.Interaction):
         color=EMBED_COLOR,
         timestamp=datetime.utcnow()
     )
-    embed.add_field(name="Halloween Points", value=str(points), inline=True)
+    embed.add_field(name="Halloween Candy", value=str(candy), inline=True)
     embed.add_field(name="Messages tracked", value=str(messages), inline=True)
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
