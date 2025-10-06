@@ -68,7 +68,7 @@ async function getDb() {
       if (!cache.users[id]) {
         cache.users[id] = {
           discord_id: id,
-          points: 0,
+          candy: 0, // Changed points to candy
           messages: 0,
           created_at: nowISOString(),
           username: null,
@@ -79,14 +79,14 @@ async function getDb() {
       return { ...cache.users[id] };
     },
 
-    // Starter points default changed to 50
-    async addUserIfNotExist(discordId, starterPoints = 50) {
+    // Starter candy default changed to 50
+    async addUserIfNotExist(discordId, starterCandy = 50) {
       await loadIfNeeded();
       const id = String(discordId);
       if (!cache.users[id]) {
         cache.users[id] = {
           discord_id: id,
-          points: starterPoints,
+          candy: starterCandy,
           messages: 0,
           created_at: nowISOString(),
           username: null,
@@ -103,7 +103,7 @@ async function getDb() {
       if (!cache.users[id]) {
         cache.users[id] = {
           discord_id: id,
-          points: 0,
+          candy: 0,
           messages: 0,
           created_at: nowISOString(),
           username: username || null,
@@ -117,34 +117,34 @@ async function getDb() {
       return { ...cache.users[id] };
     },
 
-    async updatePoints(discordId, newPoints) {
+    async updateCandy(discordId, newCandy) {
       await loadIfNeeded();
       const id = String(discordId);
       if (!cache.users[id]) throw new Error('User not found');
-      cache.users[id].points = Number(newPoints);
+      cache.users[id].candy = Number(newCandy);
       await flush();
       return { ...cache.users[id] };
     },
 
-    async givePoints(discordId, amount, reason = '') {
+    async giveCandy(discordId, amount, reason = '') {
       await loadIfNeeded();
       const id = String(discordId);
       if (!cache.users[id]) {
         cache.users[id] = {
           discord_id: id,
-          points: 0,
+          candy: 0,
           messages: 0,
           created_at: nowISOString(),
           username: null,
           discriminator: null
         };
       }
-      cache.users[id].points = (Number(cache.users[id].points) || 0) + Number(amount);
+      cache.users[id].candy = (Number(cache.users[id].candy) || 0) + Number(amount);
       cache.purchases.push({
         id: cache._nextPurchaseId++,
         discord_id: id,
         productId: 'admin-gift',
-        productName: `ADMIN GIFT: ${reason || 'points'}`,
+        productName: `ADMIN GIFT: ${reason || 'candy'}`,
         price: -Number(amount),
         status: 'confirmed',
         created_at: nowISOString(),
@@ -160,7 +160,7 @@ async function getDb() {
       if (!cache.users[id]) {
         cache.users[id] = {
           discord_id: id,
-          points: 0,
+          candy: 0,
           messages: 0,
           created_at: nowISOString(),
           username: null,
@@ -176,7 +176,7 @@ async function getDb() {
       await loadIfNeeded();
       const arr = Object.values(cache.users || {});
       arr.sort((a, b) => {
-        if (b.points !== a.points) return b.points - a.points;
+        if (b.candy !== a.candy) return b.candy - a.candy;
         return (b.messages || 0) - (a.messages || 0);
       });
       return arr.slice(0, limit).map(u => ({ ...u }));
