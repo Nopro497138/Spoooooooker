@@ -1,4 +1,4 @@
-# main.py
+# main.py (Bot)
 import os
 import asyncio
 import aiosqlite
@@ -13,7 +13,7 @@ load_dotenv()
 # No DATABASE_URL — local sqlite used
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
-WEBSITE_URL = os.getenv("NEXT_PUBLIC_WEBSITE_URL") or os.getenv("WEBSITE_URL") or "https://spoooooooker.vercel.app/"
+WEBSITE_URL = os.getenv("NEXT_PUBLIC_WEBSITE_URL") or os.getenv("WEBSITE_URL") or "https://your-site.vercel.app"
 BOT_OWNER_ID = int(os.getenv("BOT_OWNER_ID")) if os.getenv("BOT_OWNER_ID") else None
 
 intents = discord.Intents.default()
