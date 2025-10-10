@@ -1,22 +1,19 @@
-// web/lib/db.js
-// In-memory DB for serverless-friendly operation (no native sqlite3, no file writes).
-// **Ephemeral**: data will be lost between cold starts — acceptable for demos / previews.
-// Exposes async getDb() -> { getUser, addUserIfNotExist, upsertMeta, updateCandy, giveCandy, incrementMessages, getLeaderboard, getAllUsers, addPurchase, getPurchases, confirmPurchase }
-
+// lib/db.js
+// Serverless-friendly in-memory DB. Exposes async getDb().
 let _cache = null;
 let _nextPurchaseId = 1;
+
+function nowISOString() {
+  return new Date().toISOString();
+}
 
 async function loadIfNeeded() {
   if (_cache) return _cache;
   _cache = {
-    users: {},       // { [discordId]: { discord_id, candy, messages, created_at, username, discriminator } }
-    purchases: []    // { id, discord_id, productId, productName, price, status, created_at, confirmed_at? }
+    users: {}, // discord_id => { discord_id, candy, messages, created_at, username, discriminator }
+    purchases: []
   };
   return _cache;
-}
-
-function nowISOString() {
-  return new Date().toISOString();
 }
 
 async function getDb() {
@@ -29,23 +26,6 @@ async function getDb() {
       return u ? { ...u } : null;
     },
 
-    async ensureUser(discordId) {
-      await loadIfNeeded();
-      const id = String(discordId);
-      if (!_cache.users[id]) {
-        _cache.users[id] = {
-          discord_id: id,
-          candy: 0,
-          messages: 0,
-          created_at: nowISOString(),
-          username: null,
-          discriminator: null
-        };
-      }
-      return { ..._cache.users[id] };
-    },
-
-    // Give starter candy (default 50)
     async addUserIfNotExist(discordId, starterCandy = 50) {
       await loadIfNeeded();
       const id = String(discordId);
@@ -103,7 +83,6 @@ async function getDb() {
         };
       }
       _cache.users[id].candy = (Number(_cache.users[id].candy) || 0) + Number(amount);
-      // record an audit purchase-like entry
       const p = {
         id: _nextPurchaseId++,
         discord_id: id,
@@ -145,12 +124,6 @@ async function getDb() {
       return arr.slice(0, limit).map(u => ({ ...u }));
     },
 
-    async getAllUsers() {
-      await loadIfNeeded();
-      return Object.values(_cache.users).map(u => ({ ...u }));
-    },
-
-    // Purchases
     async addPurchase({ discord_id, productId, productName, price }) {
       await loadIfNeeded();
       const id = _nextPurchaseId++;
@@ -183,9 +156,13 @@ async function getDb() {
       _cache.purchases[idx].status = 'confirmed';
       _cache.purchases[idx].confirmed_at = nowISOString();
       return { ..._cache.purchases[idx] };
+    },
+
+    async getAllUsers() {
+      await loadIfNeeded();
+      return Object.values(_cache.users).map(u => ({ ...u }));
     }
   };
 }
 
-// CommonJS export (used by many API routes)
 module.exports = { getDb };
