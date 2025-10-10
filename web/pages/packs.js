@@ -13,7 +13,7 @@ export default function Packs() {
   useEffect(()=> {
     let mounted = true
     fetch('/api/user').then(r=>r.json()).then(j=>{ if(!mounted) return; setUser(j && j.discord_id ? j : null) }).catch(()=>setUser(null))
-    return ()=> mounted = false
+    return ()=> mounted=false
   },[])
 
   async function buy(pack) {
@@ -23,8 +23,7 @@ export default function Packs() {
     const j = await res.json()
     if (j.error) alert('Error: ' + j.error)
     else {
-      alert('Purchase submitted. Owner will confirm and grant perks.');
-      // refresh user
+      alert('Purchase submitted. Owner will confirm and grant perks.')
       fetch('/api/user').then(r=>r.json()).then(j=>setUser(j))
     }
   }
@@ -33,9 +32,9 @@ export default function Packs() {
     <>
       <NavBar />
       <div className="container" style={{paddingTop:20}}>
-        <div className="card" style={{padding:24}}>
-          <h2 style={{margin:0, fontSize:22}}>Packs</h2>
-          <p className="small" style={{marginTop:8}}>Open packs to get boosters, candy and cosmetics.</p>
+        <div className="card">
+          <h2>Packs</h2>
+          <p className="small">Open packs to get boosters, candy and cosmetics.</p>
 
           <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12, marginTop:16}}>
             {packs.map(p => (
