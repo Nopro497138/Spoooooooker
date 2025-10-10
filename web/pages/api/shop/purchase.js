@@ -1,10 +1,7 @@
 // pages/api/shop/purchase.js
-// Server endpoint to purchase products/packs.
-// Expects cookie 'discord_id' and JSON body { productId }
-
 const cookie = require('cookie');
-const { getDb } = require('/lib/db.js');         // must exist at project root: /lib/db.js
-const products = require('/data/products.js');   // must exist at project root: /data/products.js
+const { getDb } = require('/lib/db.js');
+const products = require('/data/products.js');
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -26,14 +23,26 @@ export default async function handler(req, res) {
 
     if ((user.candy || 0) < product.price) return res.status(400).json({ error: 'Insufficient candy' });
 
-    // Deduct candy and create a pending purchase record
+    // Deduct candy
     await db.updateCandy(discordId, (user.candy || 0) - product.price);
+
+    // create purchase
     const purchase = await db.addPurchase({
       discord_id: discordId,
       productId: product.id,
       productName: product.name,
       price: product.price
     });
+
+    // Auto-confirm if not required
+    if (!product.require_confirmation) {
+      await db.confirmPurchase(purchase.id);
+      // apply immediate rewards if any
+      if (product.rewards && product.rewards.candy) {
+        // give the reward candy
+        await db.giveCandy(discordId, product.rewards.candy, `auto-pack:${product.id}`);
+      }
+    }
 
     res.json({ ok: true, purchase });
   } catch (err) {
