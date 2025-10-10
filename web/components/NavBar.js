@@ -1,35 +1,35 @@
 // components/NavBar.js
-import Link from 'next/link'
-import { useEffect, useState } from 'react'
-import Head from 'next/head'
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import Head from 'next/head';
 
-export default function NavBar(){
-  const [user, setUser] = useState(null)
-  const [leaderboard, setLeaderboard] = useState([])
+export default function NavBar() {
+  const [user, setUser] = useState(null);
+  const [leaderboard, setLeaderboard] = useState([]);
 
-  async function fetchUser(){
+  async function fetchUser() {
     try {
-      const res = await fetch('/api/user');
+      const res = await fetch('/api/user', { cache: 'no-store' });
       const j = await res.json();
       setUser(j && j.discord_id ? j : null);
-    } catch (e) { setUser(null) }
+    } catch (e) { setUser(null); }
   }
 
-  async function fetchLeaderboard(){
+  async function fetchLeaderboard() {
     try {
-      const res = await fetch('/api/leaderboard');
+      const res = await fetch('/api/leaderboard', { cache: 'no-store' });
       const j = await res.json();
       setLeaderboard(j.leaderboard || []);
-    } catch (e) { setLeaderboard([]) }
+    } catch (e) { setLeaderboard([]); }
   }
 
-  useEffect(()=> {
+  useEffect(() => {
     fetchUser();
     fetchLeaderboard();
-    const t1 = setInterval(fetchUser, 4000); // live update candy frequently
+    const t1 = setInterval(fetchUser, 2000); // frequent live update for candy
     const t2 = setInterval(fetchLeaderboard, 8000);
-    return ()=> { clearInterval(t1); clearInterval(t2) }
-  }, [])
+    return () => { clearInterval(t1); clearInterval(t2); };
+  }, []);
 
   return (
     <>
@@ -41,7 +41,7 @@ export default function NavBar(){
 
       <nav className="navbar" role="navigation">
         <div className="nav-left">
-          <Link href="/"><a className="logo" style={{textDecoration:'none'}}>
+          <Link href="/"><a className="logo" style={{ textDecoration: 'none' }}>
             <div className="brand">SPOOOOOOKER</div>
           </a></Link>
 
@@ -51,31 +51,31 @@ export default function NavBar(){
             <Link href="/shop"><a>Shop</a></Link>
             <Link href="/packs"><a>Packs</a></Link>
             <Link href="/info"><a>Info</a></Link>
-            {user && user.is_owner ? <Link href="/dev"><a style={{color:'var(--accent)'}}>Dev</a></Link> : null}
+            {user && user.is_owner ? <Link href="/dev"><a style={{ color: 'var(--accent)' }}>Dev</a></Link> : null}
           </div>
         </div>
 
-        <div className="nav-right" style={{alignItems:'center'}}>
+        <div className="nav-right" style={{ alignItems: 'center' }}>
           {user ? (
             <>
-              <div style={{display:'flex',alignItems:'center',gap:10}}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div className="points-badge" title="Your Halloween Candy" aria-live="polite">
                   <img src="/images/halloween_candy.png" alt="candy" className="candy-icon" />
-                  <div style={{fontWeight:800}}>{user.candy}</div>
+                  <div style={{ fontWeight: 800 }}>{user.candy}</div>
                 </div>
-                <div style={{textAlign:'right', minWidth:150}}>
-                  <div style={{fontSize:12,color:'rgba(255,255,255,0.7)'}}>Logged in as</div>
-                  <div style={{fontWeight:800}}>{user.username ? `${user.username}${user.discriminator ? '#'+user.discriminator : ''}` : 'User '+user.discord_id}</div>
+                <div style={{ textAlign: 'right', minWidth: 150 }}>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Logged in as</div>
+                  <div style={{ fontWeight: 800 }}>{user.username ? `${user.username}${user.discriminator ? '#' + user.discriminator : ''}` : 'User ' + user.discord_id}</div>
                 </div>
               </div>
             </>
           ) : (
             <a className="discord-btn" href="/api/auth/login" title="Sign in with Discord">
-              <span style={{marginLeft:8, fontWeight:800}}>Sign in</span>
+              <span style={{ marginLeft: 8, fontWeight: 800 }}>Sign in</span>
             </a>
           )}
         </div>
       </nav>
     </>
-  )
+  );
 }
