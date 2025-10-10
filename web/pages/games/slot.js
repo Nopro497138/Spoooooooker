@@ -1,122 +1,95 @@
-// web/pages/games/slot.js
+// pages/games/slot.js
 import NavBar from '../../components/NavBar'
-import { useEffect, useRef, useState } from 'react'
-
-const SYMBOLS = ['🍒','🎃','⭐','👻','💀']
-const SYMBOL_WEIGHTS = [40, 20, 15, 15, 10] // heavier cherries, rarer skull/star
-
-function randomSymbol() {
-  const total = SYMBOL_WEIGHTS.reduce((a,b)=>a+b,0)
-  let r = Math.floor(Math.random() * total)
-  for (let i=0;i<SYMBOL_WEIGHTS.length;i++){
-    r -= SYMBOL_WEIGHTS[i]
-    if (r < 0) return SYMBOLS[i]
-  }
-  return SYMBOLS[0]
-}
+import { useEffect, useState } from 'react'
 
 export default function Slot() {
   const [user, setUser] = useState(null)
-  const [bet, setBet] = useState(1)
   const [spinning, setSpinning] = useState(false)
-  const [reels, setReels] = useState(['?','?','?'])
   const [result, setResult] = useState(null)
+  const [reels, setReels] = useState(['?', '?', '?'])
 
   useEffect(()=> {
     let mounted = true
-    fetch('/api/user').then(r=>r.json()).then(j=>{ if(!mounted) return; setUser(j && j.discord_id ? j : null)}).catch(()=>setUser(null))
+    fetch('/api/user').then(r=>r.json()).then(j=>{ if(!mounted) return; setUser(j && j.discord_id ? j : null) }).catch(()=>setUser(null))
     return ()=> mounted=false
   },[])
+
+  async function spin(bet) {
+    if (!user) { alert('Sign in'); return }
+    if (bet <=0) return
+    setSpinning(true)
+    setResult(null)
+    // visual fake spin
+    const symbols = ['cherry','lemon','pumpkin','ghost','skull','star']
+    let steps = 30
+    for (let i=0;i<steps;i++){
+      setReels([symbols[Math.floor(Math.random()*symbols.length)], symbols[Math.floor(Math.random()*symbols.length)], symbols[Math.floor(Math.random()*symbols.length)]])
+      await new Promise(r=>setTimeout(r, 40 + i*3))
+    }
+
+    // call server
+    try {
+      const res = await fetch('/api/slot', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ bet }) })
+      const j = await res.json()
+      if (j.error) { alert(j.error); setSpinning(false); return }
+      setReels(j.reels)
+      setResult(j)
+      // refresh user balance
+      const ures = await fetch('/api/user'); const uj = await ures.json(); setUser(uj && uj.discord_id ? uj : null)
+    } catch (err) {
+      console.error(err); alert('Error')
+    } finally {
+      setSpinning(false)
+    }
+  }
 
   if (!user) {
     return (
       <>
         <NavBar />
-        <main style={{minHeight:'calc(100vh - 64px)', display:'flex', alignItems:'center', justifyContent:'center'}}>
-          <div className="card center" style={{flexDirection:'column', gap:12, padding:28}}>
-            <h2 style={{color:'var(--accent)'}}>Sign in to play Slot Machine</h2>
-            <p className="small">You must be logged in with Discord to play.</p>
-            <a className="discord-btn" href="/api/auth/login">Sign in with Discord</a>
+        <main className="container">
+          <div className="card center" style={{padding:28}}>
+            <h2>Sign in to play Slot Machine</h2>
           </div>
         </main>
       </>
     )
   }
 
-  async function spin() {
-    setResult(null)
-    const b = Number(bet) || 0
-    if (b <= 0) return alert('Enter valid bet')
-    if (b > user.points) return alert('Insufficient points')
-    setSpinning(true)
-
-    // simulate server-side slot result by calling API endpoint /api/slot
-    try {
-      const res = await fetch('/api/slot', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ bet: b })})
-      const j = await res.json()
-      // create animation: cycle symbols quickly, then settle to result.reels
-      const cycles = 18
-      for (let t=0;t<cycles;t++){
-        setReels([randomSymbol(), randomSymbol(), randomSymbol()])
-        // speed up then slow down
-        await new Promise(r=>setTimeout(r, 50 + t*12))
-      }
-      // settle to server result if present
-      if (j && j.reels) {
-        setReels(j.reels)
-        setResult(j)
-      } else {
-        // fallback compute local
-        const final = [randomSymbol(), randomSymbol(), randomSymbol()]
-        setReels(final)
-        setResult({ outcome:'Unknown', multiplier:0, change: -b, newPoints: user.points - b, reels: final })
-      }
-    } catch (err) {
-      setResult({ error: 'Server error' })
-    } finally {
-      setSpinning(false)
-      // refresh user points quickly
-      fetch('/api/user').then(r=>r.json()).then(j=>{ if (j && j.discord_id) setUser(j) })
-    }
-  }
-
   return (
     <>
       <NavBar />
-      <div className="container" style={{alignItems:'start'}}>
+      <div className="container" style={{paddingTop:20}}>
         <div className="card">
           <h2>Slot Machine</h2>
-          <p className="small" style={{marginTop:8}}>Spin three reels. Match symbols for multipliers. Set a bet and try your luck.</p>
+          <p className="small">Spin 3 reels. Match symbols to win multipliers.</p>
 
-          <div style={{display:'flex', gap:12, marginTop:12, alignItems:'center', flexWrap:'wrap'}}>
-            <input className="input" type="number" min={1} value={bet} onChange={e=>setBet(e.target.value)} style={{width:140}} />
-            <button className="btn" onClick={spin} disabled={spinning}>{spinning ? 'Spinning...' : 'Spin'}</button>
-            <div style={{marginLeft:'auto'}} className="small">Your points: <strong style={{color:'var(--accent)'}}>{user.points}</strong></div>
+          <div style={{display:'flex',justifyContent:'center',marginTop:16,gap:12}}>
+            <div className="card" style={{padding:18,minWidth:320,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <div style={{fontSize:28,fontWeight:900, minWidth:70, textAlign:'center'}}>{reels[0]}</div>
+              <div style={{fontSize:28,fontWeight:900, minWidth:70, textAlign:'center'}}>{reels[1]}</div>
+              <div style={{fontSize:28,fontWeight:900, minWidth:70, textAlign:'center'}}>{reels[2]}</div>
+            </div>
           </div>
 
-          <div className="slot-stage" style={{marginTop:18}}>
-            <div className="reel"><div className="symbol">{reels[0]}</div></div>
-            <div className="reel"><div className="symbol">{reels[1]}</div></div>
-            <div className="reel"><div className="symbol">{reels[2]}</div></div>
+          <div style={{display:'flex',gap:12,marginTop:12}}>
+            <button className="btn" onClick={()=>spin(1)} disabled={spinning}>Spin 1</button>
+            <button className="btn" onClick={()=>spin(5)} disabled={spinning}>Spin 5</button>
+            <div style={{marginLeft:'auto'}} className="small">Your candy: <strong style={{color:'var(--accent)'}}>{user.candy}</strong></div>
           </div>
 
           {result && (
-            <div style={{marginTop:12, padding:12, borderRadius:10, background:'rgba(0,0,0,0.35)'}}>
-              {result.error ? <div style={{color:'#ff9b9b'}}><strong>Error:</strong> {result.error}</div> : (
-                <>
-                  <div><strong>Outcome:</strong> {result.outcome}</div>
-                  <div><strong>Multiplier:</strong> {result.multiplier}x</div>
-                  <div><strong>Change:</strong> {(result.change >= 0 ? '+' : '') + result.change} points</div>
-                  <div><strong>New balance:</strong> {result.newPoints}</div>
-                </>
-              )}
+            <div className="card" style={{marginTop:12}}>
+              <div><strong>Payout:</strong> {result.multiplier}x — Won: {result.won}</div>
+              <div><strong>New balance:</strong> {result.newCandy}</div>
             </div>
           )}
+
         </div>
 
         <aside className="card">
-          <h4>Slot Machine</h4>
-          <p className="small">Symbols and multipliers are randomized. Check the Info page for tips.</p>
+          <h4>Shop</h4>
+          <div className="small">Buy Packs and more in the Shop.</div>
         </aside>
       </div>
     </>
