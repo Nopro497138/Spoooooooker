@@ -2,7 +2,7 @@
 const cookie = require('cookie');
 const { getDb } = require('../../lib/db.js');
 
-export default async function handler(req, res){
+export default async function handler(req, res) {
   try {
     const cookies = req.headers.cookie ? cookie.parse(req.headers.cookie) : {};
     const discordId = cookies.discord_id;
