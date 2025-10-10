@@ -1,4 +1,4 @@
-// web/pages/api/auth/login.js
+// pages/api/auth/login.js
 export default function handler(req, res) {
   const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
   if (!DISCORD_CLIENT_ID) {
