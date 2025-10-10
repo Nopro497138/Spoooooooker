@@ -1,12 +1,24 @@
 // pages/games/slot.js
 import NavBar from '../../components/NavBar'
+import Modal from '../../components/Modal'
 import { useEffect, useState } from 'react'
+
+const EMOJIS = {
+  'cherry': '🍒',
+  'lemon': '🍋',
+  'pumpkin': '🎃',
+  'ghost': '👻',
+  'skull': '💀',
+  'star': '✨'
+}
 
 export default function Slot() {
   const [user, setUser] = useState(null)
   const [spinning, setSpinning] = useState(false)
   const [result, setResult] = useState(null)
   const [reels, setReels] = useState(['?', '?', '?'])
+  const [modalOpen, setModalOpen] = useState(false)
+  const [bet, setBet] = useState(1)
 
   useEffect(()=> {
     let mounted = true
@@ -14,30 +26,35 @@ export default function Slot() {
     return ()=> mounted=false
   },[])
 
-  async function spin(bet) {
-    if (!user) { alert('Sign in'); return }
-    if (bet <=0) return
+  async function spin(amount){
+    if (!user) { setModalOpen(true); setResult({ error: 'Sign in first' }); return }
+    amount = Number(amount)
+    if (!amount || amount <= 0) { setModalOpen(true); setResult({ error: 'Invalid bet' }); return }
+    if (amount > (user.candy || 0)) { setModalOpen(true); setResult({ error: 'Insufficient candy' }); return }
+
     setSpinning(true)
     setResult(null)
-    // visual fake spin
-    const symbols = ['cherry','lemon','pumpkin','ghost','skull','star']
-    let steps = 30
+
+    const symbols = Object.keys(EMOJIS)
+    // quick visual spin
+    let steps = 28
     for (let i=0;i<steps;i++){
       setReels([symbols[Math.floor(Math.random()*symbols.length)], symbols[Math.floor(Math.random()*symbols.length)], symbols[Math.floor(Math.random()*symbols.length)]])
-      await new Promise(r=>setTimeout(r, 40 + i*3))
+      await new Promise(r=>setTimeout(r, 30 + i*4))
     }
 
     // call server
     try {
-      const res = await fetch('/api/slot', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ bet }) })
+      const res = await fetch('/api/slot', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ bet: amount }) })
       const j = await res.json()
-      if (j.error) { alert(j.error); setSpinning(false); return }
+      if (j.error) { setModalOpen(true); setResult({ error: j.error }); setSpinning(false); return }
       setReels(j.reels)
       setResult(j)
-      // refresh user balance
+      setModalOpen(true)
+      // refresh user
       const ures = await fetch('/api/user'); const uj = await ures.json(); setUser(uj && uj.discord_id ? uj : null)
     } catch (err) {
-      console.error(err); alert('Error')
+      console.error(err); setModalOpen(true); setResult({ error: 'Server error' })
     } finally {
       setSpinning(false)
     }
@@ -66,24 +83,29 @@ export default function Slot() {
 
           <div style={{display:'flex',justifyContent:'center',marginTop:16,gap:12}}>
             <div className="card" style={{padding:18,minWidth:320,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              <div style={{fontSize:28,fontWeight:900, minWidth:70, textAlign:'center'}}>{reels[0]}</div>
-              <div style={{fontSize:28,fontWeight:900, minWidth:70, textAlign:'center'}}>{reels[1]}</div>
-              <div style={{fontSize:28,fontWeight:900, minWidth:70, textAlign:'center'}}>{reels[2]}</div>
+              <div style={{fontSize:42,textAlign:'center', minWidth:70}}>{EMOJIS[reels[0]] || '❔'}</div>
+              <div style={{fontSize:42,textAlign:'center', minWidth:70}}>{EMOJIS[reels[1]] || '❔'}</div>
+              <div style={{fontSize:42,textAlign:'center', minWidth:70}}>{EMOJIS[reels[2]] || '❔'}</div>
             </div>
           </div>
 
-          <div style={{display:'flex',gap:12,marginTop:12}}>
-            <button className="btn" onClick={()=>spin(1)} disabled={spinning}>Spin 1</button>
-            <button className="btn" onClick={()=>spin(5)} disabled={spinning}>Spin 5</button>
+          <div style={{display:'flex',gap:12,marginTop:12, alignItems:'center'}}>
+            <input className="input" type="number" min="1" value={bet} onChange={e=>setBet(e.target.value)} style={{width:120}} />
+            <button className="btn" onClick={()=>spin(bet)} disabled={spinning}>{spinning ? 'Spinning...' : `Spin ${bet}`}</button>
             <div style={{marginLeft:'auto'}} className="small">Your candy: <strong style={{color:'var(--accent)'}}>{user.candy}</strong></div>
           </div>
 
-          {result && (
-            <div className="card" style={{marginTop:12}}>
-              <div><strong>Payout:</strong> {result.multiplier}x — Won: {result.won}</div>
-              <div><strong>New balance:</strong> {result.newCandy}</div>
-            </div>
-          )}
+          <Modal open={modalOpen} title={result && result.error ? 'Result' : 'Payout'} onClose={()=>setModalOpen(false)}>
+            {result ? (
+              result.error ? <div style={{color:'#ff7a7a'}}>{result.error}</div> :
+              <div>
+                <div><strong>Reels:</strong> {result.reels.map(r=>EMOJIS[r]||r).join(' ')}</div>
+                <div><strong>Multiplier:</strong> {result.multiplier}x</div>
+                <div><strong>Won:</strong> {result.won}</div>
+                <div><strong>New Balance:</strong> {result.newCandy}</div>
+              </div>
+            ) : null}
+          </Modal>
 
         </div>
 
