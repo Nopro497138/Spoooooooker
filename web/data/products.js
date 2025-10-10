@@ -1,9 +1,43 @@
-// web/data/products.js
+// data/products.js
+// Product definitions (packs, cosmetics, boosters).
+// Edit this file to add/remove/change products.
+
 module.exports = [
-  { id: 'ghost_hat', name: 'Ghost Hat', description: 'A spooky hat for your profile.', price: 25 },
-  { id: 'galaxy_theme', name: 'Galaxy Theme', description: 'Unlock a premium galaxy UI effect.', price: 70 },
-  { id: 'profile_badge', name: 'Profile Badge', description: 'Special badge shown on leaderboard entries.', price: 40 },
-  { id: 'bronze_pack', name: 'Bronze Pack', description: 'A Bronze Pack with basic boosters.', price: 50 },
-  { id: 'silver_pack', name: 'Silver Pack', description: 'A Silver Pack with medium boosters.', price: 100 },
-  { id: 'gold_pack', name: 'Gold Pack', description: 'A Gold Pack with powerful boosters.', price: 200 }
+  {
+    id: 'bronze_pack',
+    name: 'Bronze Pack',
+    price: 50,
+    description: 'Starter pack: small candy boost and a tiny message booster.',
+    rewards: { candy: 5, booster: 'small' }
+  },
+  {
+    id: 'silver_pack',
+    name: 'Silver Pack',
+    price: 100,
+    description: 'Better rewards: more candy, booster and profile badge.',
+    rewards: { candy: 15, booster: 'medium', badge: 'silver' }
+  },
+  {
+    id: 'gold_pack',
+    name: 'Gold Pack',
+    price: 200,
+    description: 'Top pack: large candy boost, strong booster, premium badge.',
+    rewards: { candy: 40, booster: 'large', badge: 'gold' }
+  },
+
+  // example cosmetics / items
+  {
+    id: 'ghost_hat',
+    name: 'Ghost Hat',
+    price: 25,
+    description: 'Spooky cosmetic for your profile.',
+    rewards: { cosmetic: 'ghost_hat' }
+  },
+  {
+    id: 'profile_badge',
+    name: 'Profile Badge',
+    price: 40,
+    description: 'Special badge displayed on the leaderboard.',
+    rewards: { badge: 'special' }
+  }
 ];
