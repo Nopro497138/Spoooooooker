@@ -1,35 +1,31 @@
 // lib/db.js
-// Serverless-friendly in-memory DB. Exposes async getDb().
+// Serverless-friendly in-memory DB. Ephemeral: data lost on cold starts.
+// Exposes getDb() with methods for users/purchases.
+
 let _cache = null;
 let _nextPurchaseId = 1;
 
-function nowISOString() {
-  return new Date().toISOString();
-}
+function nowISOString(){ return new Date().toISOString(); }
 
-async function loadIfNeeded() {
+async function loadIfNeeded(){
   if (_cache) return _cache;
-  _cache = {
-    users: {}, // discord_id => { discord_id, candy, messages, created_at, username, discriminator }
-    purchases: []
-  };
+  _cache = { users: {}, purchases: [] };
   return _cache;
 }
 
-async function getDb() {
+async function getDb(){
   await loadIfNeeded();
-
   return {
-    async getUser(discordId) {
+    async getUser(discordId){
       await loadIfNeeded();
       const u = _cache.users[String(discordId)];
       return u ? { ...u } : null;
     },
 
-    async addUserIfNotExist(discordId, starterCandy = 50) {
+    async addUserIfNotExist(discordId, starterCandy = 50){
       await loadIfNeeded();
       const id = String(discordId);
-      if (!_cache.users[id]) {
+      if (!_cache.users[id]){
         _cache.users[id] = {
           discord_id: id,
           candy: Number(starterCandy),
@@ -42,10 +38,10 @@ async function getDb() {
       return { ..._cache.users[id] };
     },
 
-    async upsertMeta(discordId, username, discriminator) {
+    async upsertMeta(discordId, username, discriminator){
       await loadIfNeeded();
       const id = String(discordId);
-      if (!_cache.users[id]) {
+      if (!_cache.users[id]){
         _cache.users[id] = {
           discord_id: id,
           candy: 0,
@@ -61,7 +57,7 @@ async function getDb() {
       return { ..._cache.users[id] };
     },
 
-    async updateCandy(discordId, newCandy) {
+    async updateCandy(discordId, newCandy){
       await loadIfNeeded();
       const id = String(discordId);
       if (!_cache.users[id]) throw new Error('User not found');
@@ -69,7 +65,7 @@ async function getDb() {
       return { ..._cache.users[id] };
     },
 
-    async giveCandy(discordId, amount, reason = '') {
+    async giveCandy(discordId, amount, reason = ''){
       await loadIfNeeded();
       const id = String(discordId);
       if (!_cache.users[id]) {
@@ -97,7 +93,7 @@ async function getDb() {
       return { ..._cache.users[id] };
     },
 
-    async incrementMessages(discordId, by = 1) {
+    async incrementMessages(discordId, by = 1){
       await loadIfNeeded();
       const id = String(discordId);
       if (!_cache.users[id]) {
@@ -114,33 +110,25 @@ async function getDb() {
       return { ..._cache.users[id] };
     },
 
-    async getLeaderboard(limit = 10) {
+    async getLeaderboard(limit = 10){
       await loadIfNeeded();
       const arr = Object.values(_cache.users || {});
-      arr.sort((a, b) => {
-        if ((b.candy || 0) !== (a.candy || 0)) return (b.candy || 0) - (a.candy || 0);
-        return (b.messages || 0) - (a.messages || 0);
+      arr.sort((a,b)=>{
+        if ((b.candy||0) !== (a.candy||0)) return (b.candy||0) - (a.candy||0);
+        return (b.messages||0) - (a.messages||0);
       });
-      return arr.slice(0, limit).map(u => ({ ...u }));
+      return arr.slice(0,limit).map(u => ({ ...u }));
     },
 
-    async addPurchase({ discord_id, productId, productName, price }) {
+    async addPurchase({ discord_id, productId, productName, price }){
       await loadIfNeeded();
       const id = _nextPurchaseId++;
-      const p = {
-        id,
-        discord_id: String(discord_id),
-        productId,
-        productName,
-        price: Number(price),
-        status: 'pending',
-        created_at: nowISOString()
-      };
+      const p = { id, discord_id: String(discord_id), productId, productName, price: Number(price), status: 'pending', created_at: nowISOString() };
       _cache.purchases.push(p);
       return { ...p };
     },
 
-    async getPurchases(filter = {}) {
+    async getPurchases(filter = {}){
       await loadIfNeeded();
       let list = _cache.purchases.slice();
       if (filter.discord_id) list = list.filter(p => p.discord_id === String(filter.discord_id));
@@ -149,7 +137,7 @@ async function getDb() {
       return list.map(p => ({ ...p }));
     },
 
-    async confirmPurchase(id) {
+    async confirmPurchase(id){
       await loadIfNeeded();
       const idx = _cache.purchases.findIndex(p => p.id === Number(id));
       if (idx === -1) throw new Error('Purchase not found');
@@ -158,7 +146,7 @@ async function getDb() {
       return { ..._cache.purchases[idx] };
     },
 
-    async getAllUsers() {
+    async getAllUsers(){
       await loadIfNeeded();
       return Object.values(_cache.users).map(u => ({ ...u }));
     }
