@@ -1,4 +1,5 @@
-# main.py (Bot)
+# main.py
+# Discord bot that awards "Halloween Candy" and integrates with the website.
 import os
 import asyncio
 import aiosqlite
@@ -10,7 +11,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# No DATABASE_URL — local sqlite used
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
 WEBSITE_URL = os.getenv("NEXT_PUBLIC_WEBSITE_URL") or os.getenv("WEBSITE_URL") or "https://your-site.vercel.app"
@@ -55,7 +55,7 @@ async def on_ready():
     await db.execute(CREATE_TABLE)
     await db.commit()
 
-    # sync guild commands if you want global remove .sync()
+    # sync global commands (optional)
     await tree.sync()
     print("Slash commands synced. Local SQLite DB ready.")
 
@@ -71,13 +71,12 @@ async def on_message(message: discord.Message):
     cur = await db.execute("SELECT messages, candy FROM users WHERE discord_id = ?", (message.author.id,))
     rec = await cur.fetchone()
     if rec is None:
-        # fallback ensure and fetch again
         await ensure_user(db, message.author.id)
         cur = await db.execute("SELECT messages, candy FROM users WHERE discord_id = ?", (message.author.id,))
         rec = await cur.fetchone()
 
-    messages = int(rec["messages"]) + 1
-    candy = int(rec["candy"])
+    messages = int(rec["messages"] or 0) + 1
+    candy = int(rec["candy"] or 0)
     await db.execute("UPDATE users SET messages = ? WHERE discord_id = ?", (messages, message.author.id))
     await db.commit()
 
@@ -86,8 +85,10 @@ async def on_message(message: discord.Message):
         candy += 1
         await db.execute("UPDATE users SET candy = ? WHERE discord_id = ?", (candy, message.author.id))
         await db.commit()
+        # use the provided custom emoji ID here in the text if the emoji exists in the guilds where bot posts
+        halloween_emoji = "<:halloween_candy:1424808785985409125>"
         embed = discord.Embed(
-            title="🎃 Halloween Candy Awarded!",
+            title=f"{halloween_emoji} Halloween Candy Awarded!",
             description=f"Congrats {message.author.mention}, you reached **{messages} messages** and earned **1 Halloween Candy**!",
             color=EMBED_COLOR,
             timestamp=datetime.utcnow()
@@ -96,13 +97,13 @@ async def on_message(message: discord.Message):
         embed.set_footer(text="Keep chatting to earn more!")
         await message.channel.send(embed=embed)
 
-    # allow other commands to process
     await bot.process_commands(message)
 
 @tree.command(name="info", description="Show bot & site info and how to use it")
 async def info(interaction: discord.Interaction):
+    halloween_emoji = "<:halloween_candy:1424808785985409125>"
     embed = discord.Embed(
-        title="👻 Halloween-Planko — Info",
+        title=f"{halloween_emoji} Halloween — Info",
         description="Welcome! This bot tracks your messages and awards Halloween Candy. Use them on the website to play games like Planko and the Slot Machine.",
         color=EMBED_COLOR,
         timestamp=datetime.utcnow()
@@ -113,7 +114,6 @@ async def info(interaction: discord.Interaction):
     embed.set_footer(text="Have fun — good luck!")
     await interaction.response.send_message(embed=embed)
 
-# Admin helper: show user status
 @tree.command(name="mystatus", description="Show your Halloween Candy & message count (private)")
 async def mystatus(interaction: discord.Interaction):
     if not db:
