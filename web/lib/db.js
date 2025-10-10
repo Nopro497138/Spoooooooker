@@ -1,21 +1,191 @@
-// lib/db.js
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
-const dbPath = path.resolve(process.cwd(), 'db.sqlite');  // SQLite-Datei
+// web/lib/db.js
+// In-memory DB for serverless-friendly operation (no native sqlite3, no file writes).
+// **Ephemeral**: data will be lost between cold starts — acceptable for demos / previews.
+// Exposes async getDb() -> { getUser, addUserIfNotExist, upsertMeta, updateCandy, giveCandy, incrementMessages, getLeaderboard, getAllUsers, addPurchase, getPurchases, confirmPurchase }
 
-let db;
+let _cache = null;
+let _nextPurchaseId = 1;
 
-function openDb() {
-  if (!db) {
-    db = new sqlite3.Database(dbPath, (err) => {
-      if (err) {
-        console.error("Failed to open database:", err.message);
-      }
-    });
-  }
-  return db;
+async function loadIfNeeded() {
+  if (_cache) return _cache;
+  _cache = {
+    users: {},       // { [discordId]: { discord_id, candy, messages, created_at, username, discriminator } }
+    purchases: []    // { id, discord_id, productId, productName, price, status, created_at, confirmed_at? }
+  };
+  return _cache;
 }
 
-module.exports = {
-  openDb,
-};
+function nowISOString() {
+  return new Date().toISOString();
+}
+
+async function getDb() {
+  await loadIfNeeded();
+
+  return {
+    async getUser(discordId) {
+      await loadIfNeeded();
+      const u = _cache.users[String(discordId)];
+      return u ? { ...u } : null;
+    },
+
+    async ensureUser(discordId) {
+      await loadIfNeeded();
+      const id = String(discordId);
+      if (!_cache.users[id]) {
+        _cache.users[id] = {
+          discord_id: id,
+          candy: 0,
+          messages: 0,
+          created_at: nowISOString(),
+          username: null,
+          discriminator: null
+        };
+      }
+      return { ..._cache.users[id] };
+    },
+
+    // Give starter candy (default 50)
+    async addUserIfNotExist(discordId, starterCandy = 50) {
+      await loadIfNeeded();
+      const id = String(discordId);
+      if (!_cache.users[id]) {
+        _cache.users[id] = {
+          discord_id: id,
+          candy: Number(starterCandy),
+          messages: 0,
+          created_at: nowISOString(),
+          username: null,
+          discriminator: null
+        };
+      }
+      return { ..._cache.users[id] };
+    },
+
+    async upsertMeta(discordId, username, discriminator) {
+      await loadIfNeeded();
+      const id = String(discordId);
+      if (!_cache.users[id]) {
+        _cache.users[id] = {
+          discord_id: id,
+          candy: 0,
+          messages: 0,
+          created_at: nowISOString(),
+          username: username || null,
+          discriminator: discriminator || null
+        };
+      } else {
+        _cache.users[id].username = username || _cache.users[id].username;
+        _cache.users[id].discriminator = discriminator || _cache.users[id].discriminator;
+      }
+      return { ..._cache.users[id] };
+    },
+
+    async updateCandy(discordId, newCandy) {
+      await loadIfNeeded();
+      const id = String(discordId);
+      if (!_cache.users[id]) throw new Error('User not found');
+      _cache.users[id].candy = Number(newCandy);
+      return { ..._cache.users[id] };
+    },
+
+    async giveCandy(discordId, amount, reason = '') {
+      await loadIfNeeded();
+      const id = String(discordId);
+      if (!_cache.users[id]) {
+        _cache.users[id] = {
+          discord_id: id,
+          candy: 0,
+          messages: 0,
+          created_at: nowISOString(),
+          username: null,
+          discriminator: null
+        };
+      }
+      _cache.users[id].candy = (Number(_cache.users[id].candy) || 0) + Number(amount);
+      // record an audit purchase-like entry
+      const p = {
+        id: _nextPurchaseId++,
+        discord_id: id,
+        productId: 'admin-gift',
+        productName: `ADMIN GIFT: ${reason || 'candy'}`,
+        price: -Number(amount),
+        status: 'confirmed',
+        created_at: nowISOString(),
+        meta: { admin_action: true }
+      };
+      _cache.purchases.push(p);
+      return { ..._cache.users[id] };
+    },
+
+    async incrementMessages(discordId, by = 1) {
+      await loadIfNeeded();
+      const id = String(discordId);
+      if (!_cache.users[id]) {
+        _cache.users[id] = {
+          discord_id: id,
+          candy: 0,
+          messages: 0,
+          created_at: nowISOString(),
+          username: null,
+          discriminator: null
+        };
+      }
+      _cache.users[id].messages = (_cache.users[id].messages || 0) + Number(by);
+      return { ..._cache.users[id] };
+    },
+
+    async getLeaderboard(limit = 10) {
+      await loadIfNeeded();
+      const arr = Object.values(_cache.users || {});
+      arr.sort((a, b) => {
+        if ((b.candy || 0) !== (a.candy || 0)) return (b.candy || 0) - (a.candy || 0);
+        return (b.messages || 0) - (a.messages || 0);
+      });
+      return arr.slice(0, limit).map(u => ({ ...u }));
+    },
+
+    async getAllUsers() {
+      await loadIfNeeded();
+      return Object.values(_cache.users).map(u => ({ ...u }));
+    },
+
+    // Purchases
+    async addPurchase({ discord_id, productId, productName, price }) {
+      await loadIfNeeded();
+      const id = _nextPurchaseId++;
+      const p = {
+        id,
+        discord_id: String(discord_id),
+        productId,
+        productName,
+        price: Number(price),
+        status: 'pending',
+        created_at: nowISOString()
+      };
+      _cache.purchases.push(p);
+      return { ...p };
+    },
+
+    async getPurchases(filter = {}) {
+      await loadIfNeeded();
+      let list = _cache.purchases.slice();
+      if (filter.discord_id) list = list.filter(p => p.discord_id === String(filter.discord_id));
+      if (filter.status) list = list.filter(p => p.status === filter.status);
+      list.sort((a,b)=> new Date(b.created_at) - new Date(a.created_at));
+      return list.map(p => ({ ...p }));
+    },
+
+    async confirmPurchase(id) {
+      await loadIfNeeded();
+      const idx = _cache.purchases.findIndex(p => p.id === Number(id));
+      if (idx === -1) throw new Error('Purchase not found');
+      _cache.purchases[idx].status = 'confirmed';
+      _cache.purchases[idx].confirmed_at = nowISOString();
+      return { ..._cache.purchases[idx] };
+    }
+  };
+}
+
+// CommonJS export (used by many API routes)
+module.exports = { getDb };
