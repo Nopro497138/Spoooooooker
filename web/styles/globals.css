@@ -1,41 +1,166 @@
-/* styles/global.css */
-body {
-  background: url('your-background-url') no-repeat center center fixed;
+/* styles/globals.css */
+/* Global styles, animated galaxy + halloween theme.
+   IMPORTANT: place background image at /public/images/space_halloween_bg.jpg
+   and candy emoji image at /public/images/halloween_candy.png
+*/
+
+:root{
+  --bg-1: #040410;
+  --bg-2: #0f0f11;
+  --accent: #9b59ff;
+  --accent-2: #ff6b6b;
+  --muted: rgba(230,230,230,0.6);
+}
+
+/* reset */
+*{box-sizing:border-box}
+html,body,#__next{height:100%}
+body{
+  margin:0;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  color:#e8e8ee;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  background:
+    radial-gradient(circle at 8% 12%, rgba(155,89,255,0.06), transparent 6%),
+    radial-gradient(circle at 92% 88%, rgba(255,107,107,0.04), transparent 8%),
+    linear-gradient(180deg,var(--bg-1),var(--bg-2));
+  overflow-y:auto;
+  animation: bg-pulse 10s ease-in-out infinite;
+}
+
+/* page background image (no webpack import; must exist in public/images/) */
+body::before{
+  content:"";
+  position:fixed; inset:0; z-index:-2;
+  background-image: url('/images/space_halloween_bg.jpg');
   background-size: cover;
-  font-family: 'Arial', sans-serif;
+  background-position: center;
+  opacity:0.25;
+  filter: blur(2px) saturate(1.05);
+  pointer-events:none;
 }
 
-button {
-  transition: all 0.3s ease-in-out;
+/* subtle starfield layer */
+body::after{
+  content:"";
+  position:fixed; inset:0; z-index:-1; pointer-events:none;
+  background-image:
+    radial-gradient(1px 1px at 12% 24%, rgba(255,255,255,0.06) 0%, transparent 60%),
+    radial-gradient(1px 1px at 36% 64%, rgba(255,255,255,0.05) 0%, transparent 60%),
+    radial-gradient(1px 1px at 72% 22%, rgba(255,255,255,0.04) 0%, transparent 60%),
+    radial-gradient(1px 1px at 88% 82%, rgba(255,255,255,0.03) 0%, transparent 60%);
+  animation: stars-move 40s linear infinite;
+  opacity:0.8;
+  mix-blend-mode:screen;
 }
 
-button:hover {
-  transform: scale(1.1);
-  background-color: #ff6f00;
+@keyframes bg-pulse {
+  0% { filter: hue-rotate(0deg); }
+  50% { filter: hue-rotate(6deg) saturate(1.02); }
+  100% { filter: hue-rotate(0deg); }
+}
+@keyframes stars-move {
+  0% { transform: translateY(0px); opacity:0.7 }
+  50% { transform: translateY(-40px); opacity:0.85 }
+  100% { transform: translateY(0px); opacity:0.7 }
 }
 
+/* layout */
+.container {
+  max-width:1100px;
+  margin:28px auto;
+  padding:20px;
+  display:grid;
+  grid-template-columns: 1fr 360px;
+  gap:20px;
+  animation: page-entrance 550ms ease;
+}
+@keyframes page-entrance {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.card {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border: 1px solid rgba(255,255,255,0.04);
+  padding:18px;
+  border-radius:12px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+.card:hover { transform: translateY(-6px); box-shadow: 0 18px 60px rgba(0,0,0,0.6); }
+
+/* navbar */
 .navbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: rgba(0, 0, 0, 0.6);
-  padding: 15px;
+  width:100%;
+  height:64px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:0 18px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border-bottom:1px solid rgba(255,255,255,0.02);
+  position:sticky;
+  top:0;
+  z-index:40;
+  backdrop-filter: blur(6px);
 }
+.nav-left{display:flex;align-items:center;gap:12px}
+.logo { display:flex;align-items:center;gap:10px;font-weight:800;color:var(--accent); text-decoration:none; transition: transform 260ms ease; }
+.logo:hover { transform: scale(1.02); }
 
-.discord-btn {
-  background-color: #7289da;
-  padding: 10px 15px;
-  border-radius: 5px;
-  color: white;
-  text-decoration: none;
-  display: inline-block;
-}
+.nav-links { display:flex; gap:12px; align-items:center; margin-left:12px; }
+.nav-links a { color: #ddd; text-decoration:none; padding:8px 10px; border-radius:8px; font-weight:600; font-size:14px; transition: background 220ms, color 220ms; }
+.nav-links a.active, .nav-links a:hover { background: rgba(255,255,255,0.02); color: #fff; box-shadow: 0 6px 20px rgba(0,0,0,0.45) }
 
+.nav-right { display:flex; gap:12px; align-items:center; }
+
+/* points badge & discord button */
 .points-badge {
-  background-color: #ff4500;
-  padding: 10px;
-  border-radius: 5px;
-  color: white;
-  display: inline-block;
-  font-size: 14px;
+  background: linear-gradient(180deg,var(--accent), #7a3bff);
+  color:#0b0b14; font-weight:800; padding:8px 12px; border-radius:999px; min-width:92px; text-align:center;
+  box-shadow: 0 8px 24px rgba(155,89,255,0.12);
+  display:flex; align-items:center; gap:8px;
+  transform-origin:center; transition: transform 220ms ease;
+}
+.points-badge:hover { transform: translateY(-3px); }
+
+/* Discord sign-in CTA */
+.discord-btn {
+  display:inline-flex; align-items:center; gap:10px; padding:10px 14px; border-radius:10px; cursor:pointer;
+  text-decoration:none; color:#fff; font-weight:800; background: linear-gradient(180deg,#6b4bff,#4a22ff);
+  box-shadow:0 8px 24px rgba(74,34,255,0.12);
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+.discord-btn:hover { transform: translateY(-4px); box-shadow: 0 18px 40px rgba(74,34,255,0.2); }
+
+/* candy icon used in nav */
+.candy-icon {
+  width:20px;
+  height:20px;
+  display:inline-block;
+  vertical-align:middle;
+}
+
+/* inputs & buttons */
+.input, .select {
+  padding:12px;border-radius:10px;background:transparent;border:1px solid rgba(255,255,255,0.06);color:#fff;font-size:16px; transition: box-shadow 180ms ease, transform 120ms ease;
+}
+.btn {
+  padding:12px 16px;border-radius:12px;background:linear-gradient(180deg,#ff8b8b,#ff5252);border:none;color:#111;font-weight:800;cursor:pointer; transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.btn:hover { transform: translateY(-4px); box-shadow: 0 18px 40px rgba(255,82,82,0.16); }
+.btn.secondary { background: linear-gradient(180deg,#6b4bff,#4a22ff); color:#fff; }
+
+/* helpers */
+.small { font-size:13px; color:var(--muted) }
+.center { display:flex; align-items:center; justify-content:center }
+
+/* responsive */
+@media (max-width: 980px) {
+  .container { grid-template-columns: 1fr; padding:14px; }
+  .navbar { height:68px; padding:0 12px }
+  .nav-right { gap:8px }
 }
