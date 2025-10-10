@@ -22,6 +22,7 @@ async function getDb(){
       return u ? { ...u } : null;
     },
 
+    // Only set starterCandy if user truly doesn't exist
     async addUserIfNotExist(discordId, starterCandy = 50){
       await loadIfNeeded();
       const id = String(discordId);
