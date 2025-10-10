@@ -3,8 +3,8 @@
 // Expects cookie 'discord_id' and JSON body { productId }
 
 const cookie = require('cookie');
-const { getDb } = require('../../lib/db.js');         // must exist at project root: /lib/db.js
-const products = require('../../data/products.js');   // must exist at project root: /data/products.js
+const { getDb } = require('/../lib/db.js');         // must exist at project root: /lib/db.js
+const products = require('/../data/products.js');   // must exist at project root: /data/products.js
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
