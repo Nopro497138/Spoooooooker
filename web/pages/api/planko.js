@@ -1,61 +1,58 @@
-// web/pages/api/planko.js
-// Plays Planko for the logged-in user. Validation + updates JSON DB.
-
+// pages/api/planko.js
 const cookie = require('cookie');
 const { getDb } = require('../../lib/db');
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
+function chooseColumnByRandom(numCols){
+  // simple random plinko simulation: simulate binary steps across rows
+  let pos = Math.floor(numCols/2);
+  const rows = 11;
+  for (let r=0;r<rows;r++){
+    pos += (Math.random() < 0.5) ? -1 : 1;
+    if (pos < 0) pos = 0;
+    if (pos >= numCols) pos = numCols-1;
   }
+  return pos;
+}
+
+export default async function handler(req, res){
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const cookies = req.headers.cookie ? cookie.parse(req.headers.cookie) : {};
   const discordId = cookies.discord_id;
-  if (!discordId) return res.status(401).json({ error: 'Not authenticated. Please sign in with Discord.' });
+  if (!discordId) return res.status(401).json({ error: 'Not authenticated. Please sign in.' });
 
-  const betRaw = req.body?.bet ?? req.query?.bet;
-  const bet = Number(betRaw);
-  if (!bet || isNaN(bet) || bet <= 0) return res.status(400).json({ error: 'Invalid bet amount.' });
+  const { bet } = req.body || {};
+  const betN = Number(bet);
+  if (!betN || isNaN(betN) || betN <= 0) return res.status(400).json({ error: 'Invalid bet' });
 
   try {
     const db = await getDb();
-    const r = await db.getUser(discordId);
-    if (!r) return res.status(400).json({ error: 'User not found.' });
-    let points = Number(r.points || 0);
+    const user = await db.getUser(discordId);
+    if (!user) return res.status(400).json({ error: 'User not found' });
+    if (betN > (user.candy || 0)) return res.status(400).json({ error: 'Insufficient candy' });
 
-    if (bet > points) return res.status(400).json({ error: 'Insufficient points.' });
+    // multipliers for columns (15 columns)
+    const multipliers = [0, 0.5, 1, 1.1, 1.2, 1.4, 2, 3, 5, 2, 1.4, 1.2, 1.1, 1, 0.5];
+    const cols = multipliers.length;
 
-    // roll logic for Planko (ball falls into multipliers)
-    const roll = Math.random(); // 0..1
-    // map to multipliers distribution
-    // 0..0.7 -> lose (0)
-    // 0.7..0.9 -> 1.5x
-    // 0.9..0.97 -> 2x
-    // 0.97..1 -> 5x
-    let multiplier = 0;
-    let outcome = 'Lose';
-    if (roll < 0.7) { multiplier = 0; outcome = 'Lose'; }
-    else if (roll < 0.9) { multiplier = 1.5; outcome = 'Small win'; }
-    else if (roll < 0.97) { multiplier = 2; outcome = 'Nice win'; }
-    else { multiplier = 5; outcome = 'Jackpot!'; }
+    const col = chooseColumnByRandom(cols);
+    const mult = multipliers[col] || 0;
+    const won = Math.floor(mult * betN);
+    const change = won - betN;
+    const newCandy = (user.candy || 0) - betN + Math.max(0, won);
 
-    const won = Math.floor(multiplier * bet);
-    const change = won - bet;
-    const newPoints = points - bet + Math.max(0, won);
+    // update DB
+    await db.updateCandy(discordId, newCandy);
 
-    await db.updatePoints(discordId, newPoints);
-
-    // include chosen "slot" index for frontend animation (0..3 representing multiplier buckets)
-    let bucket = 0;
-    if (multiplier === 0) bucket = 0;
-    else if (multiplier === 1.5) bucket = 1;
-    else if (multiplier === 2) bucket = 2;
-    else bucket = 3;
-
-    res.json({ outcome, multiplier, change, newPoints, bucket });
+    res.json({
+      outcome: col === 0 ? 'Lose' : (mult > 1 ? 'Win' : 'Neutral'),
+      column: col,
+      multiplier: mult,
+      change,
+      newCandy
+    });
   } catch (err) {
-    console.error('api/planko error', err);
-    res.status(500).json({ error: 'Server error.' });
+    console.error('planko api error', err);
+    res.status(500).json({ error: 'Server error' });
   }
 }
