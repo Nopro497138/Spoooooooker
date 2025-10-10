@@ -1,48 +1,47 @@
 // data/products.js
 // Product definitions (packs, cosmetics, boosters).
-// Edit this file to add/remove/change products and whether they require owner confirmation.
+// `require_confirmation`: when true owner must confirm; when false and `auto_candy` present, the candy is granted immediately.
+// Keep non-pack items simple (no automatic rewards) so owner can handle them manually.
 
 module.exports = [
   {
     id: 'bronze_pack',
     name: 'Bronze Pack',
     price: 50,
-    description: 'Starter pack: small candy boost and a tiny message booster.',
-    rewards: { candy: 5, booster: 'small' },
+    description: 'Starter pack: small candy boost.',
+    auto_candy: 5,
     require_confirmation: false
   },
   {
     id: 'silver_pack',
     name: 'Silver Pack',
     price: 100,
-    description: 'Better rewards: more candy, booster and profile badge.',
-    rewards: { candy: 15, booster: 'medium', badge: 'silver' },
-    require_confirmation: false
+    description: 'Silver: more candy and a medium booster (owner handled).',
+    auto_candy: 15,
+    require_confirmation: true
   },
   {
     id: 'gold_pack',
     name: 'Gold Pack',
     price: 200,
-    description: 'Top pack: large candy boost, strong booster, premium badge.',
-    rewards: { candy: 40, booster: 'large', badge: 'gold' },
-    require_confirmation: false
+    description: 'Gold pack: large candy. Owner confirms some extras.',
+    auto_candy: 40,
+    require_confirmation: true
   },
 
-  // example cosmetics / items
+  // shop-only items without automatic rewards (owner handles distributions)
   {
     id: 'ghost_hat',
-    name: 'Ghost Hat',
+    name: 'Ghost Hat (manual)',
     price: 25,
-    description: 'Spooky cosmetic for your profile.',
-    rewards: { cosmetic: 'ghost_hat' },
-    require_confirmation: false
+    description: 'Cosmetic - owner will deliver after confirming.',
+    require_confirmation: true
   },
   {
     id: 'profile_badge',
-    name: 'Profile Badge',
+    name: 'Profile Badge (manual)',
     price: 40,
-    description: 'Special badge displayed on the leaderboard.',
-    rewards: { badge: 'special' },
-    require_confirmation: false
+    description: 'Special badge, owner will add this on confirm.',
+    require_confirmation: true
   }
 ];
