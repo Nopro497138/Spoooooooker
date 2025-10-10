@@ -1,5 +1,5 @@
 // pages/api/leaderboard.js
-const { getDb } = require('lib/db.js');
+const { getDb } = require('../..lib/db');
 
 export default async function handler(req, res) {
   try {
