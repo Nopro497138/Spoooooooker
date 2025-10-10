@@ -1,31 +1,57 @@
-// web/pages/index.js
-import NavBar from '../components/NavBar'
+// pages/index.js
+import NavBar from '../components/NavBar';
+import { useEffect, useState } from 'react';
 
 export default function Home() {
+  const [leaderboard, setLeaderboard] = useState([]);
+
+  async function fetchLeaderboard() {
+    try {
+      const res = await fetch('/api/leaderboard', { cache: 'no-store' });
+      const j = await res.json();
+      setLeaderboard(j.leaderboard || []);
+    } catch (e) {
+      setLeaderboard([]);
+    }
+  }
+
+  useEffect(() => {
+    fetchLeaderboard();
+    const t = setInterval(fetchLeaderboard, 8000);
+    return () => clearInterval(t);
+  }, []);
+
   return (
     <>
       <NavBar />
-      <main style={{minHeight:'calc(100vh - 64px)', display:'flex', alignItems:'center', justifyContent:'center', padding:20}}>
-        <div className="card" style={{maxWidth:1000, width:'100%'}}>
-          <section style={{display:'flex', gap:20, alignItems:'center', justifyContent:'space-between', flexWrap:'wrap'}}>
-            <div style={{flex:'1 1 420px'}}>
-              <h1 style={{color:'var(--accent)', fontSize:32}}>Welcome to <span style={{letterSpacing:2}}>spoooooooker</span></h1>
-              <p className="lead">A spooky galaxy arcade — sign in with Discord to link your account and play games like Planko and Slot Machine. Earn Halloween Points on Discord (1 point every 50 messages).</p>
-              <div style={{marginTop:16}}>
-                <a className="btn secondary" href="/games" style={{marginRight:12}}>Open Games</a>
-                <a className="btn" href="/info">Learn how to use</a>
-              </div>
-            </div>
+      <main className="container" style={{ paddingTop: 20 }}>
+        <div className="card">
+          <h2>Welcome to SPOOOOOOKER</h2>
+          <p className="small">Play games and earn Halloween Candy.</p>
 
-            <div style={{width:300, minWidth:260}}>
-              <div style={{padding:18, borderRadius:12, background:'linear-gradient(180deg, rgba(255,255,255,0.01), transparent)'}}>
-                <h3 style={{marginBottom:8}}>Your spooky hub</h3>
-                <p className="small">Sign in with Discord (top-right) to see your points and access games. The site is optimized for desktop, iPad and mobile.</p>
-              </div>
-            </div>
-          </section>
+          <div style={{ marginTop: 12 }}>
+            <h3>Games</h3>
+            <ul>
+              <li><a href="/games/planko">Planko</a></li>
+              <li><a href="/games/slot">Slot Machine</a></li>
+            </ul>
+          </div>
         </div>
+
+        <aside className="card">
+          <h4>Leaderboard</h4>
+          {leaderboard.length === 0 ? <div className="small">No players yet.</div> : (
+            <ol style={{ margin: 0, paddingLeft: 18 }}>
+              {leaderboard.map((p) => (
+                <li key={p.discord_id} style={{ marginBottom: 8 }}>
+                  <div style={{ fontWeight: 700 }}>{p.username || ('User ' + p.discord_id)}</div>
+                  <div className="small">Candy: {p.candy} • Messages: {p.messages}</div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </aside>
       </main>
     </>
-  )
+  );
 }
