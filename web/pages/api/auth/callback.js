@@ -1,9 +1,10 @@
 // pages/api/auth/callback.js
-// OAuth callback: exchanges code, fetches user, sets cookie and upserts user in memory DB.
-// Makes sure it won't overwrite an existing user's candy if already present.
+// Discord OAuth callback: exchange code, fetch user, upsert into db and create session JWT
 
+const fetch = require('node-fetch');
 const cookie = require('cookie');
 const { getDb } = require('../../../lib/db.js');
+const { createSessionToken } = require('../../../lib/auth.js');
 
 export default async function handler(req, res) {
   const code = req.query.code;
@@ -29,43 +30,54 @@ export default async function handler(req, res) {
     const tokenResp = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       body: params.toString(),
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' }
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     });
+    if (!tokenResp.ok) {
+      const txt = await tokenResp.text();
+      console.error('discord token failed', txt);
+      return res.status(502).send('OAuth token exchange failed.');
+    }
     const tokenData = await tokenResp.json();
-    if (!tokenResp.ok || !tokenData.access_token) {
-      console.error('OAuth token error', tokenData);
-      return res.status(502).send('OAuth token exchange failed. Check Redirect URI in Discord app.');
+    if (!tokenData.access_token) {
+      console.error('discord token missing', tokenData);
+      return res.status(502).send('OAuth token exchange failed.');
     }
 
     const userResp = await fetch('https://discord.com/api/users/@me', {
-      headers: { Authorization: `Bearer ${tokenData.access_token}`, 'Accept': 'application/json' }
+      headers: { Authorization: `Bearer ${tokenData.access_token}` }
     });
-    const userData = await userResp.json();
-    if (!userResp.ok || !userData || !userData.id) {
-      console.error('OAuth user fetch error', userData);
-      return res.status(502).send('Failed to fetch user from Discord.');
+    if (!userResp.ok) {
+      const t = await userResp.text();
+      console.error('discord user fetch failed', t);
+      return res.status(502).send('OAuth user fetch failed.');
     }
+    const userData = await userResp.json();
+    if (!userData || !userData.id) return res.status(502).send('Invalid user data');
 
     const db = await getDb();
-    // if user exists in our in-memory DB, do not overwrite candy
-    const existing = await db.getUser(userData.id);
-    if (!existing) {
-      await db.addUserIfNotExist(userData.id, 50); // fresh user gets starter 50
+    // if a user with this discord exists, use it; else create one and give starter candy
+    const ex = await db.getUserByDiscord(userData.id);
+    if (ex) {
+      // update meta
+      await db.upsertMetaByDiscord(userData.id, userData.username, userData.discriminator);
+      // create session token using internal user id
+      const token = createSessionToken({ sub: ex.id, provider: 'discord' });
+      const isProd = process.env.NODE_ENV === 'production';
+      res.setHeader('Set-Cookie', cookie.serialize('session', token, { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/', maxAge: 30 * 24 * 3600 }));
+      res.writeHead(302, { Location: '/' });
+      res.end();
+      return;
+    } else {
+      // create a new user linked to discord with starter candy 50
+      const created = await db.addUserIfNotExist(userData.id, 50);
+      await db.upsertMetaByDiscord(userData.id, userData.username, userData.discriminator);
+      const token = createSessionToken({ sub: created.id, provider: 'discord' });
+      const isProd = process.env.NODE_ENV === 'production';
+      res.setHeader('Set-Cookie', cookie.serialize('session', token, { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/', maxAge: 30 * 24 * 3600 }));
+      res.writeHead(302, { Location: '/' });
+      res.end();
+      return;
     }
-    await db.upsertMeta(userData.id, userData.username, userData.discriminator);
-
-    // set cookie
-    const isProd = process.env.NODE_ENV === 'production';
-    const cookieStr = cookie.serialize('discord_id', String(userData.id), {
-      httpOnly: true,
-      secure: isProd,
-      path: '/',
-      maxAge: 30 * 24 * 60 * 60,
-      sameSite: 'lax'
-    });
-    res.setHeader('Set-Cookie', cookieStr);
-    res.writeHead(302, { Location: '/' });
-    res.end();
   } catch (err) {
     console.error('OAuth callback error', err);
     res.status(500).send('Server error during OAUTH.');
