@@ -19,12 +19,20 @@ export default function ShopPage() {
     setProducts(p.products || []);
     setCoupons(p.coupons || []);
     const u = await fetch('/api/user', { cache: 'no-store' }).then(r => r.json()).catch(()=>({}));
-    setUser(u && u.id ? u : null);
+    setUser(u && (u.id || u.discord_id) ? u : null);
   }
 
   useEffect(()=> { load(); const t = setInterval(load, 6000); return ()=>clearInterval(t); }, []);
 
-  function openBuy(prod) { setSelected(prod); setModalOpen(true); setMessage(null); setCouponCode(''); }
+  function openBuy(prod) {
+    if (!user) {
+      // users must sign in first to access purchase UI
+      setMessage({ type:'error', text: 'Please sign in to buy items.' });
+      setTimeout(()=> setMessage(null), 5000);
+      return;
+    }
+    setSelected(prod); setModalOpen(true); setMessage(null); setCouponCode('');
+  }
 
   async function confirmBuy() {
     if (!selected) return;
@@ -38,23 +46,26 @@ export default function ShopPage() {
         setMessage({ type: 'success', text: `Purchase ${j.purchase.status}. Your candy: ${j.user.candy}` });
         // refresh user/products
         const u = await fetch('/api/user', { cache:'no-store' }).then(r=>r.json());
-        setUser(u && u.id ? u : null);
+        setUser(u && (u.id || u.discord_id) ? u : null);
       }
     } catch (err) {
       console.error(err);
       setMessage({ type:'error', text: 'Server error' });
     } finally {
       setBuying(false);
+      setTimeout(()=> setMessage(null), 6000);
     }
   }
 
   return (
     <>
       <NavBar />
-      <main className="container" style={{paddingTop:20}}>
+      <main className="container page-enter" style={{paddingTop:20}}>
         <div className="card" style={{padding:20}}>
           <h2>Shop</h2>
           <p className="small">Buy Packs and items with Halloween Candy. Some items require owner confirmation.</p>
+
+          {message ? <div style={{marginTop:12, color: message.type==='error' ? '#ff7a7a' : '#9bffb0'}}>{message.text}</div> : null}
 
           <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12, marginTop:12}}>
             {products.map(p => (
@@ -97,7 +108,6 @@ export default function ShopPage() {
               <button className="ghost-btn" onClick={()=>{ setModalOpen(false); setSelected(null); }}>Cancel</button>
             </div>
 
-            {message ? <div style={{marginTop:8, color: message.type==='error' ? '#ff7a7a' : '#9bffb0'}}>{message.text}</div> : null}
           </div>
         ) : null}
       </Modal>
