@@ -1,133 +1,198 @@
 # main.py
+# Discord bot for Spoooooooker
+# - Handles message counting (local JSON persistence)
+# - Awards 1 Halloween candy (emoji <:halloween_candy:1424808785985409125>) every 50 messages
+# - /link <TOKEN> command: sends token to website to link account (calls /api/link/complete)
+# - /give command (owner only) to give candy via website dev endpoint
+# Requires: DISCORD_BOT_TOKEN, BOT_OWNER_ID, WEBSITE_URL, WEBSITE_SYNC_TOKEN
+# Run on Railway (or any server). Persisting message counts in local file 'message_counts.json'.
+
 import os
+import json
 import asyncio
-import aiosqlite
-import discord
-from discord import app_commands
-from discord.ext import commands
+import aiohttp
 from datetime import datetime
 from dotenv import load_dotenv
-import json
-import urllib.request
+
+import discord
+from discord.ext import commands
 
 load_dotenv()
 
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
-WEBSITE_URL = os.getenv("NEXT_PUBLIC_WEBSITE_URL") or os.getenv("WEBSITE_URL") or "https://your-site.vercel.app"
 BOT_OWNER_ID = int(os.getenv("BOT_OWNER_ID")) if os.getenv("BOT_OWNER_ID") else None
+WEBSITE_URL = os.getenv("WEBSITE_URL") or os.getenv("NEXT_PUBLIC_WEBSITE_URL") or "http://localhost:3000"
+WEBSITE_SYNC_TOKEN = os.getenv("WEBSITE_SYNC_TOKEN") or os.getenv("SITE_SYNC_TOKEN") or None
 
-# SYNC: Where to POST updates and which token to use
-WEBSITE_SYNC_URL = os.getenv("WEBSITE_SYNC_URL")  # e.g. https://<deploy>/api/sync
-WEBSITE_SYNC_TOKEN = os.getenv("WEBSITE_SYNC_TOKEN")
+if not DISCORD_BOT_TOKEN:
+    print("Missing DISCORD_BOT_TOKEN")
+    exit(1)
 
 intents = discord.Intents.default()
-intents.message_content = True
-intents.guilds = True
 intents.messages = True
+intents.guilds = True
+intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
-tree = bot.tree
-db: aiosqlite.Connection | None = None
+EMOJI = "<:halloween_candy:1424808785985409125>"
 
-EMBED_COLOR = discord.Color.from_rgb(255, 95, 95)
+DATA_FILE = "message_counts.json"
+LOCK = asyncio.Lock()
 
-CREATE_TABLE = """
-CREATE TABLE IF NOT EXISTS users (
-  discord_id INTEGER PRIMARY KEY,
-  candy INTEGER NOT NULL DEFAULT 0,
-  messages INTEGER NOT NULL DEFAULT 0,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-"""
 
-async def http_post(url, data, headers=None):
-    """Simple async POST using urllib in a thread to avoid extra dependencies."""
-    def _do():
-        req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers or {}, method='POST')
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            return resp.read().decode('utf-8')
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, _do)
-
-async def sync_to_website(discord_id, candy):
-    if not WEBSITE_SYNC_URL or not WEBSITE_SYNC_TOKEN:
-        return
+def load_counts():
     try:
-        headers = { 'Content-Type': 'application/json', 'x-sync-token': WEBSITE_SYNC_TOKEN }
-        data = { 'discord_id': str(discord_id), 'candy': int(candy) }
-        await http_post(WEBSITE_SYNC_URL, data, headers)
-    except Exception as e:
-        print("Warning: sync failed", e)
+        with open(DATA_FILE, "r") as f:
+            return json.load(f)
+    except Exception:
+        return {}
 
-async def ensure_user(conn, discord_id: int):
-    await conn.execute("INSERT OR IGNORE INTO users (discord_id, candy, messages) VALUES (?, ?, ?)", (discord_id, 50, 0))
-    await conn.commit()
-    # push initial candy to website
-    cur = await conn.execute("SELECT candy FROM users WHERE discord_id = ?", (discord_id,))
-    rec = await cur.fetchone()
-    if rec:
-        await sync_to_website(discord_id, int(rec["candy"]))
+
+def save_counts(data):
+    with open(DATA_FILE, "w") as f:
+        json.dump(data, f)
+
+
+async def give_candy_via_website(discord_id: int, amount: int, reason: str = ""):
+    if not WEBSITE_URL:
+        return False, "No WEBSITE_URL configured"
+    url = WEBSITE_URL.rstrip("/") + "/api/dev/give_points"
+    headers = {
+        "Content-Type": "application/json",
+    }
+    if WEBSITE_SYNC_TOKEN:
+        headers["x-website-sync-token"] = WEBSITE_SYNC_TOKEN
+    payload = {"discord_id": str(discord_id), "amount": int(amount)}
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload, headers=headers, timeout=15) as resp:
+                j = await resp.json()
+                return resp.status == 200 or resp.status == 201, j
+    except Exception as e:
+        return False, {"error": str(e)}
+
 
 @bot.event
 async def on_ready():
-    global db
     print(f"Bot ready. Logged in as {bot.user} ({bot.user.id})")
-    db = await aiosqlite.connect("data.db")
-    db.row_factory = aiosqlite.Row
-    await db.execute(CREATE_TABLE)
-    await db.commit()
-    await tree.sync()
-    print("Ready and DB initialized.")
+    # ensure local counts file exists
+    data = load_counts()
+    save_counts(data)
+    # register slash commands (application commands)
+    try:
+        # create tree commands
+        tree = bot.tree
+
+        @tree.command(name="info", description="Show bot & site info and how to use it")
+        async def info(interaction: discord.Interaction):
+            embed = discord.Embed(
+                title="SPOOOOOOKER — Info & Games",
+                description="Play spooky games and earn Halloween Candy. Link your Discord account to the website to manage candy and play online.",
+                color=discord.Color.from_rgb(160, 64, 255),
+                timestamp=datetime.utcnow()
+            )
+            embed.add_field(name="How to link", value="Use `/link <TOKEN>` to link your website account (get token via website).", inline=False)
+            embed.add_field(name="Earning candy", value="Send messages — every 50 messages you earn 1 Halloween Candy. Use it in Shop / Packs / Games.", inline=False)
+            embed.add_field(name="Support", value="Contact the developer if anything breaks.", inline=False)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        @tree.command(name="mystatus", description="Show your candy & message count (private)")
+        async def mystatus(interaction: discord.Interaction):
+            discord_id = interaction.user.id
+            # read local counts
+            counts = load_counts()
+            rec = counts.get(str(discord_id), {"messages": 0, "awarded": 0})
+            # attempt to query website user for authoritative candy
+            candy_str = "N/A"
+            try:
+                async with aiohttp.ClientSession() as session:
+                    # website user retrieval by discord not provided, so we show local awarded plus note
+                    pass
+            except:
+                pass
+            embed = discord.Embed(title=f"Status for {interaction.user.display_name}", color=discord.Color.from_rgb(160, 64, 255), timestamp=datetime.utcnow())
+            embed.add_field(name="Halloween Candy (local)", value=str(rec.get("candy_snapshot", "unknown")), inline=True)
+            embed.add_field(name="Messages tracked (local)", value=str(rec.get("messages", 0)), inline=True)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        @tree.command(name="link", description="Link your website account with a token (use token from website)")
+        @discord.app_commands.describe(token="Token generated on the website (Settings -> Link)")
+        async def link(interaction: discord.Interaction, token: str):
+            await interaction.response.defer(ephemeral=True)
+            discord_id = str(interaction.user.id)
+            url = WEBSITE_URL.rstrip("/") + "/api/link/complete"
+            headers = {"Content-Type": "application/json"}
+            if WEBSITE_SYNC_TOKEN:
+                headers["x-website-sync-token"] = WEBSITE_SYNC_TOKEN
+            payload = {"token": token, "discord_id": discord_id}
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(url, json=payload, headers=headers, timeout=10) as resp:
+                        data = await resp.json()
+                        if resp.status == 200:
+                            await interaction.followup.send(f"✅ Link successful! Website user linked to your Discord. Candy: {data.get('user', {}).get('candy', 'N/A')}", ephemeral=True)
+                        else:
+                            await interaction.followup.send(f"⚠️ Link failed: {data.get('error', 'Unknown')}", ephemeral=True)
+            except Exception as e:
+                await interaction.followup.send(f"❌ Error contacting website: {e}", ephemeral=True)
+
+        @tree.command(name="give", description="Owner: give candy to a Discord user (owner only)")
+        @discord.app_commands.describe(target="Discord user or ID", amount="Amount of candy to give")
+        async def give(interaction: discord.Interaction, target: str, amount: int):
+            if BOT_OWNER_ID is None or interaction.user.id != BOT_OWNER_ID:
+                await interaction.response.send_message("You are not allowed to use this command.", ephemeral=True)
+                return
+            await interaction.response.defer(ephemeral=True)
+            discord_id = target
+            if discord_id.startswith("<@") and discord_id.endswith(">"):
+                discord_id = discord_id.strip("<@!>")
+            ok, resp = await give_candy_via_website(discord_id, amount, reason=f"owner:{interaction.user.id}")
+            if ok:
+                await interaction.followup.send(f"✅ Given {amount} candy to {discord_id}.", ephemeral=True)
+            else:
+                await interaction.followup.send(f"⚠️ Failed: {resp}", ephemeral=True)
+
+        await bot.tree.sync()
+        print("Slash commands synced.")
+    except Exception as e:
+        print("Failed to register slash commands:", e)
+
 
 @bot.event
 async def on_message(message: discord.Message):
-    if message.author.bot: return
-    if not db: return
-
-    await ensure_user(db, message.author.id)
-    cur = await db.execute("SELECT messages, candy FROM users WHERE discord_id = ?", (message.author.id,))
-    rec = await cur.fetchone()
-    if not rec:
-        await ensure_user(db, message.author.id)
-        cur = await db.execute("SELECT messages, candy FROM users WHERE discord_id = ?", (message.author.id,))
-        rec = await cur.fetchone()
-
-    messages = int(rec["messages"] or 0) + 1
-    candy = int(rec["candy"] or 0)
-    await db.execute("UPDATE users SET messages = ? WHERE discord_id = ?", (messages, message.author.id))
-    await db.commit()
-
-    if messages % 50 == 0:
-        candy += 1
-        await db.execute("UPDATE users SET candy = ? WHERE discord_id = ?", (candy, message.author.id))
-        await db.commit()
-        # sync to website
-        await sync_to_website(message.author.id, candy)
-        halloween_emoji = "<:halloween_candy:1424808785985409125>"
-        embed = discord.Embed(title=f"{halloween_emoji} Halloween Candy Awarded!", description=f"Congrats {message.author.mention}, you reached **{messages} messages** and earned **1 Halloween Candy**!", color=EMBED_COLOR, timestamp=datetime.utcnow())
-        embed.add_field(name="Total Halloween Candy", value=str(candy))
-        await message.channel.send(embed=embed)
+    if message.author.bot:
+        return
+    author_id = str(message.author.id)
+    async with LOCK:
+        data = load_counts()
+        rec = data.get(author_id, {"messages": 0, "awarded": 0, "candy_snapshot": None})
+        rec["messages"] = rec.get("messages", 0) + 1
+        # award every 50 messages
+        if rec["messages"] % 50 == 0:
+            # award 1 candy via website
+            ok, resp = await give_candy_via_website(author_id, 1, reason="messages-50")
+            if ok:
+                rec["awarded"] = rec.get("awarded", 0) + 1
+                # update candy snapshot if website returned value
+                try:
+                    if isinstance(resp, dict) and resp.get("user"):
+                        rec["candy_snapshot"] = resp["user"].get("candy")
+                except:
+                    pass
+                try:
+                    await message.channel.send(f"🎉 {EMOJI} Congrats {message.author.mention}, you've reached {rec['messages']} messages and were awarded **1 Halloween Candy**!")
+                except:
+                    pass
+            else:
+                try:
+                    await message.channel.send(f"⚠️ Could not award candy right now (website error).")
+                except:
+                    pass
+        data[author_id] = rec
+        save_counts(data)
 
     await bot.process_commands(message)
 
-@tree.command(name="mystatus", description="Show your Halloween Candy & message count")
-async def mystatus(interaction: discord.Interaction):
-    if not db:
-        await interaction.response.send_message("Database not ready.", ephemeral=True)
-        return
-    await ensure_user(db, interaction.user.id)
-    cur = await db.execute("SELECT candy, messages FROM users WHERE discord_id = ?", (interaction.user.id,))
-    rec = await cur.fetchone()
-    candy = int(rec["candy"]) if rec and rec["candy"] is not None else 0
-    messages = int(rec["messages"]) if rec and rec["messages"] is not None else 0
-    embed = discord.Embed(title=f"Status for {interaction.user.display_name}", color=EMBED_COLOR, timestamp=datetime.utcnow())
-    embed.add_field(name="Halloween Candy", value=str(candy), inline=True)
-    embed.add_field(name="Messages tracked", value=str(messages), inline=True)
-    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 if __name__ == "__main__":
-    if not DISCORD_BOT_TOKEN:
-        print("Missing DISCORD_BOT_TOKEN")
-        exit(1)
     bot.run(DISCORD_BOT_TOKEN)
