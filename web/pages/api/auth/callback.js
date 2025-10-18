@@ -1,7 +1,5 @@
 // pages/api/auth/callback.js
 // Discord OAuth callback: exchange code, fetch user, upsert into db and create session JWT
-
-const fetch = require('node-fetch');
 const cookie = require('cookie');
 const { getDb } = require('../../../lib/db.js');
 const { createSessionToken } = require('../../../lib/auth.js');
@@ -27,6 +25,7 @@ export default async function handler(req, res) {
     params.append('redirect_uri', redirect_uri);
     params.append('scope', 'identify');
 
+    // use global fetch available in Next.js runtime
     const tokenResp = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       body: params.toString(),
