@@ -7,6 +7,7 @@ export default async function handler(req, res) {
     const cookies = req.headers.cookie ? cookie.parse(req.headers.cookie) : {};
     const discordId = cookies.discord_id;
     if (!discordId) {
+      // return empty object but 200 so client can rely on shape
       return res.json({});
     }
     const db = await getDb();
@@ -15,8 +16,8 @@ export default async function handler(req, res) {
     const ownerId = process.env.OWNER_ID ? String(process.env.OWNER_ID) : null;
     res.json({
       discord_id: user.discord_id,
-      candy: user.candy || 0,
-      messages: user.messages || 0,
+      candy: Number(user.candy || 0),
+      messages: Number(user.messages || 0),
       username: user.username || null,
       discriminator: user.discriminator || null,
       is_owner: ownerId && String(ownerId) === String(user.discord_id)
