@@ -1,77 +1,111 @@
 // pages/dev/index.js
-import NavBar from '../../components/NavBar'
-import { useEffect, useState } from 'react'
+import NavBar from '../../components/NavBar';
+import { useEffect, useState } from 'react';
 
-export default function Dev() {
-  const [user, setUser] = useState(null)
-  const [purchases, setPurchases] = useState([])
+export default function DevPage() {
+  const [user, setUser] = useState(null);
+  const [pending, setPending] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [giving, setGiving] = useState(false);
+  const [targetId, setTargetId] = useState('');
+  const [amount, setAmount] = useState(10);
 
-  useEffect(()=> {
-    let mounted = true
-    fetch('/api/user').then(r=>r.json()).then(j=>{ if(!mounted) return; setUser(j && j.discord_id ? j : null) })
-    fetch('/api/dev/purchases').then(r=>r.json()).then(j=>setPurchases(j.purchases || []))
-    return ()=> mounted=false
-  },[])
-
-  async function confirm(id) {
-    await fetch('/api/dev/confirm_purchase', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id }) })
-    const r = await fetch('/api/dev/purchases'); const j = await r.json(); setPurchases(j.purchases || [])
+  async function loadUser() {
+    const u = await fetch('/api/user', { cache:'no-store' }).then(r=>r.json()).catch(()=>({}));
+    setUser(u && u.id ? u : null);
   }
 
-  async function giveCandy() {
-    const discord = prompt('Discord ID to give candy to?')
-    const amount = Number(prompt('Amount?'))
-    if (!discord || !amount) return
-    await fetch('/api/dev/give_points', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ discord_id: discord, amount }) })
-    alert('Given (if user exists).')
+  async function loadPending() {
+    const p = await fetch('/api/dev/purchases', { cache:'no-store' }).then(r=>r.json()).catch(()=>({purchases:[]}))
+    setPending(p.purchases || []);
   }
 
-  if (!user) {
-    return <>
-      <NavBar />
-      <main className="container"><div className="card center" style={{padding:28}}>Sign in as owner to view Dev tools</div></main>
-    </>
+  async function loadUsers() {
+    const list = await fetch('/api/dev/users', { cache:'no-store' }).then(r=>r.json()).catch(()=>({users:[]}));
+    setUsers(list.users || []);
   }
-  if (!user.is_owner) {
-    return <>
-      <NavBar />
-      <main className="container"><div className="card center" style={{padding:28}}>You are not the owner.</div></main>
-    </>
+
+  useEffect(()=> { loadUser(); const t=setInterval(loadUser,3000); return ()=>clearInterval(t); },[]);
+  useEffect(()=> { loadPending(); loadUsers(); const t=setInterval(()=>{loadPending(); loadUsers()},8000); return ()=>clearInterval(t); },[]);
+
+  async function confirmPurchase(id) {
+    try {
+      await fetch('/api/dev/confirm_purchase', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id }) });
+      await loadPending(); await loadUsers();
+    } catch(err){ console.error(err) }
+  }
+
+  async function givePoints() {
+    if (!targetId || !amount) return;
+    setGiving(true);
+    try {
+      await fetch('/api/dev/give_points', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ discord_id: targetId, amount }) });
+      setTargetId(''); setAmount(10);
+      await loadUsers();
+    } catch(e){ console.error(e) }
+    setGiving(false);
+  }
+
+  if (!user || !user.is_owner) {
+    return (
+      <>
+        <NavBar />
+        <main className="container" style={{paddingTop:20}}>
+          <div className="card" style={{padding:20}}>
+            <h2>Dev Dashboard</h2>
+            <p className="small">You must be the owner to access this page.</p>
+          </div>
+        </main>
+      </>
+    );
   }
 
   return (
     <>
       <NavBar />
       <main className="container" style={{paddingTop:20}}>
-        <div className="card">
-          <h2>Dev Dashboard</h2>
-          <p className="small">Confirm purchases and manage users.</p>
-
-          <div style={{marginTop:12}}>
-            <button className="btn secondary" onClick={giveCandy}>Give Candy</button>
+        <div style={{display:'grid', gridTemplateColumns:'1fr 360px', gap:16}}>
+          <div className="card" style={{padding:16}}>
+            <h3>Pending Purchases</h3>
+            {pending.length===0 ? <div className="small">No pending purchases.</div> : (
+              <ul>
+                {pending.map(p=>(
+                  <li key={p.id} style={{marginBottom:8}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                      <div>
+                        <div style={{fontWeight:800}}>{p.productName}</div>
+                        <div className="small">User: {p.discord_id} • Price: {p.price}</div>
+                      </div>
+                      <div>
+                        <button className="btn" onClick={()=>confirmPurchase(p.id)}>Confirm</button>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
-          <div style={{marginTop:18}}>
-            <h3>Pending purchases</h3>
-            {purchases.length===0 ? <div className="small">No purchases</div> : purchases.map(p => (
-              <div key={p.id} className="card" style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:8}}>
-                <div>
-                  <div><strong>{p.productName}</strong> — {p.price} candy</div>
-                  <div className="small">User: {p.discord_id} • {p.created_at}</div>
+          <aside className="card" style={{padding:16}}>
+            <h3>Give Candy</h3>
+            <div className="small">Give candy to a user by Discord ID (owner only).</div>
+            <input className="input" placeholder="Discord ID" value={targetId} onChange={e=>setTargetId(e.target.value)} />
+            <input className="input" type="number" placeholder="Amount" value={amount} onChange={e=>setAmount(Number(e.target.value))} />
+            <button className="btn" onClick={givePoints} disabled={giving}>{giving ? 'Sending...' : 'Give'}</button>
+
+            <div style={{height:14}} />
+            <h4>Users</h4>
+            <div style={{maxHeight:260, overflowY:'auto'}}>
+              {users.length===0 ? <div className="small">No users yet</div> : users.map(u=>(
+                <div key={u.id} style={{marginBottom:8}}>
+                  <div style={{fontWeight:800}}>{u.username || (u.email || u.discord_id || u.id)}</div>
+                  <div className="small">Candy: {u.candy} • Messages: {u.messages}</div>
                 </div>
-                <div>
-                  <button className="btn" onClick={()=>confirm(p.id)}>Confirm</button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </aside>
         </div>
-
-        <aside className="card">
-          <h4>Quick</h4>
-          <div className="small">Owner tools.</div>
-        </aside>
       </main>
     </>
-  )
+  );
 }
