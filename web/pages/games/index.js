@@ -1,62 +1,31 @@
-// web/pages/games/index.js
+// pages/games/index.js
 import NavBar from '../../components/NavBar'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
 
-export default function Games() {
-  const [user, setUser] = useState(null)
-
-  useEffect(() => {
-    let mounted = true
-    fetch('/api/user').then(r => r.json()).then(j => {
-      if (!mounted) return
-      setUser(j && j.discord_id ? j : null)
-    }).catch(()=>setUser(null))
-    return ()=> mounted = false
-  },[])
-
-  // If not logged in show nothing but login CTA
-  if (!user) {
-    return (
-      <>
-        <NavBar />
-        <main style={{minHeight:'calc(100vh - 64px)', display:'flex', alignItems:'center', justifyContent:'center'}}>
-          <div className="card center" style={{flexDirection:'column', gap:12, padding:28}}>
-            <h2 style={{color:'var(--accent)'}}>Sign in to access Games</h2>
-            <p className="small">You must be logged in with Discord to play.</p>
-            <a className="discord-btn" href="/api/auth/login">Sign in with Discord</a>
-          </div>
-        </main>
-      </>
-    )
-  }
-
+export default function GamesIndex() {
   return (
     <>
       <NavBar />
-      <div className="container" style={{alignItems:'start'}}>
-        <div className="card">
+      <main className="container" style={{paddingTop:20}}>
+        <div className="card" style={{padding:24}}>
           <h2>Games</h2>
-          <p className="small" style={{marginTop:8}}>Choose a game below. Your points are shown in the top-right.</p>
+          <p className="small">Choose a game — your Halloween Candy balance is shown in the top-right. Sign in to play.</p>
 
-          <div style={{display:'grid', gap:12, marginTop:14}}>
-            <Link href="/games/planko"><a className="card" style={{display:'block', textDecoration:'none', color:'inherit'}}>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))', gap:16, marginTop:12}}>
+            <div className="card" style={{padding:18}}>
               <h3>Planko</h3>
-              <p className="small">Drop the ball and land on a multiplier. Classic and spooky!</p>
-            </a></Link>
+              <p className="small">Drop a ball into multipliers. Skill + luck.</p>
+              <Link href="/games/planko"><a className="link-inline">Play Planko →</a></Link>
+            </div>
 
-            <Link href="/games/slot"><a className="card" style={{display:'block', textDecoration:'none', color:'inherit'}}>
+            <div className="card" style={{padding:18}}>
               <h3>Slot Machine</h3>
-              <p className="small">Spin 3 reels. Match symbols to win multipliers and prizes.</p>
-            </a></Link>
+              <p className="small">Spin 3 reels. Match emojis to win candy.</p>
+              <Link href="/games/slot"><a className="link-inline">Play Slot →</a></Link>
+            </div>
           </div>
         </div>
-
-        <aside className="card">
-          <h4>Leaderboard</h4>
-          <p className="small">Top players are visible on the home page and updated after each game.</p>
-        </aside>
-      </div>
+      </main>
     </>
   )
 }
