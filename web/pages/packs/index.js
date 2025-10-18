@@ -13,13 +13,16 @@ export default function PacksPage() {
     const p = await fetch('/api/products').then(r => r.json()).catch(()=>({products:[]}));
     setProducts((p.products||[]).filter(x=>x.id && x.id.includes('_pack')));
     const u = await fetch('/api/user', { cache:'no-store' }).then(r=>r.json()).catch(()=>({}));
-    setUser(u && u.id ? u : null);
+    setUser(u && (u.id || u.discord_id) ? u : null);
   }
 
   useEffect(()=>{ load(); const t = setInterval(load, 7000); return ()=>clearInterval(t); },[]);
 
   async function openPack(pack) {
-    if (!user) return;
+    if (!user) {
+      setOpenResult({ error: 'Please sign in to open packs.' });
+      return;
+    }
     if ((user.candy || 0) < pack.price) {
       setOpenResult({ error: 'Insufficient candy' });
       return;
@@ -31,24 +34,24 @@ export default function PacksPage() {
       if (!res.ok) {
         setOpenResult({ error: j.error || 'Purchase failed' });
       } else {
-        // simulate pack opening animation result
         const gained = pack.auto_candy || 0;
         setOpenResult({ ok: true, gained, status: j.purchase.status });
         const u = await fetch('/api/user', { cache:'no-store' }).then(r=>r.json());
-        setUser(u && u.id ? u : null);
+        setUser(u && (u.id || u.discord_id) ? u : null);
       }
     } catch (err) {
       console.error(err);
       setOpenResult({ error: 'Server error' });
     } finally {
       setOpening(false);
+      setTimeout(()=> setOpenResult(null), 7000);
     }
   }
 
   return (
     <>
       <NavBar />
-      <main className="container" style={{paddingTop:20}}>
+      <main className="container page-enter" style={{paddingTop:20}}>
         <div className="card" style={{padding:20}}>
           <h2>Packs</h2>
           <p className="small">Open thematic packs for candy and boosters.</p>
